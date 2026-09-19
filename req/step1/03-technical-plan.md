@@ -10,7 +10,7 @@ Kilo data source → Kilo adapter → normalize/group → TreeDataProvider → V
 
 Kilo остаётся единственным источником истины. Hub не создаёт собственный пользовательский реестр папок и не меняет Kilo storage.
 
-Конкретная реализация `Kilo adapter` выбирается только после Discovery. Предпочтение отдаётся официальному API Kilo; прямое чтение storage допустимо лишь как документированный read-only fallback.
+`Kilo adapter` читает metadata из локальной `kilo.db` через read-only SQLite connection. Официальный CLI используется только в Discovery как oracle с фиксированным `--max-count 10000`. Hub не зависит от отдельной установки CLI и не использует private runtime VS Code-расширения Kilo.
 
 ## 2. Стек
 
@@ -18,11 +18,11 @@ Kilo остаётся единственным источником истины
 - Node.js runtime Extension Host;
 - `@types/vscode`;
 - `TreeDataProvider`;
-- API/adapter к локальным данным Kilo;
+- SQLite adapter к локальной `kilo.db`;
 - `@vscode/vsce` для сборки `.vsix`;
 - unit и extension integration tests.
 
-React, webview, SQLite Hub и отдельный backend не нужны, если Discovery не обнаружит объективную техническую необходимость.
+React, webview, собственная SQLite Hub и отдельный backend не нужны. Чтение существующей `kilo.db` не означает создание собственной базы Hub.
 
 ## 3. Возможная структура
 
@@ -61,17 +61,17 @@ kilo-hub/
 
 ## 5. Алгоритм обновления
 
-1. Прочитать записи диалогов из Kilo текущего профиля в read-only режиме.
-2. Для каждой записи извлечь `id`, `title`, `updatedAt`, признак архивирования и связь с папкой.
-3. Отбросить архивные и удалённые записи, записи без достоверной связи с папкой, `.code-workspace`, remote URI и UNC-пути.
+1. Определить путь к текущей `kilo.db`, проверить schema/version и открыть WAL-aware read-only connection.
+2. Для каждой записи извлечь `session.id`, `session.title`, `session.directory`, timestamps, `parent_id` и `time_archived`.
+3. Оставить только записи с `parent_id IS NULL` и `time_archived IS NULL`; отбросить записи без валидного `session.directory`, `.code-workspace`, remote URI и UNC-пути.
 4. Нормализовать локальный путь Windows.
 5. Сгруппировать диалоги по нормализованному пути.
 6. Отбросить пустые группы.
 7. Проверить доступность локальных путей.
 8. Отсортировать папки и диалоги.
-9. Атомарно заменить in-memory model и обновить `Kilo Folders`.
+9. Атомарно заменить in-memory model и обновить `Kilo Folders`; отсутствующие в новой выборке sessions и опустевшие группы удалить.
 
-При ошибке обновления уже показанная корректная модель может остаться в памяти до следующего refresh, но не должна записываться как независимый реестр.
+При ошибке обновления connection закрывается, а уже показанная корректная модель может остаться в памяти до следующего refresh, но не должна записываться как независимый реестр.
 
 ## 6. Нормализация и группировка
 
@@ -80,7 +80,7 @@ kilo-hub/
 - учитывать separator и trailing separator;
 - принимать только локальные пути и `file` URI текущей Windows-среды;
 - исключать `.code-workspace`, multi-root, remote URI и UNC-пути;
-- объединять дубли одного диалога по подтверждённому ID;
+- объединять дубли одного диалога по `session.id`;
 - не группировать запись, если связь с папкой неоднозначна;
 - вычислять label папки из локального пути, не из текста диалога.
 
@@ -91,7 +91,7 @@ Discovery должен подтвердить, как надёжно распо�
 Приоритет:
 
 1. явное сохранённое название диалога Kilo;
-2. нейтральная метка `Без названия`.
+2. defensive fallback `Без названия` для повреждённого пустого значения с записью предупреждения в Output Channel.
 
 Hub не генерирует название через LLM и не читает сообщения для самостоятельной суммаризации.
 
@@ -146,7 +146,7 @@ vscode.env.openExternal(folderUri);
 - parser/adapter на обезличенных fixtures Kilo;
 - записи с title и без title;
 - записи со связью с папкой и без неё;
-- исключение архивных и удалённых записей;
+- исключение дочерних и архивных sessions;
 - исключение `.code-workspace`, remote URI и UNC-путей;
 - группировка нескольких диалогов одной папки;
 - исключение группы без диалогов;
@@ -156,6 +156,9 @@ vscode.env.openExternal(folderUri);
 - missing path state;
 - повреждённая запись;
 - неизвестная версия схемы.
+- Kilo ниже 7.7.5 и несовместимая более новая schema;
+- read-only SQLite connection, WAL и busy error;
+- сверка SQLite результата с fixture официального CLI;
 
 ### Extension integration
 
@@ -171,11 +174,12 @@ vscode.env.openExternal(folderUri);
 
 ### Ручной smoke test
 
-- установка `.vsix` в отдельный VS Code profile;
+- установка `.vsix` в отдельный VS Code profile, запущенный с изолированной тестовой Kilo database/environment через подтверждённый override;
 - несколько реальных папок с разным количеством Kilo-диалогов;
 - контрольная папка без Kilo-диалогов;
 - создание нового диалога и `Refresh`;
 - изменение title и `Refresh`;
+- удаление session и `Refresh`;
 - открытие папки в текущем окне, новом окне и Проводнике Windows;
 - удалённая папка с оставшейся историей;
 - путь с пробелами и не-ASCII символами;
@@ -196,8 +200,8 @@ npm run package
 
 ## 12. Порядок реализации
 
-1. Выполнить Kilo storage/API Discovery.
-2. Зафиксировать поддерживаемые версии и схему данных.
+1. Выполнить `kilo.db`/SQLite Discovery spike в Extension Host.
+2. Зафиксировать Kilo 7.7.5 как minimum, schema guard для новых версий и SQLite runtime.
 3. Создать обезличенные fixtures.
 4. Реализовать read-only Kilo adapter.
 5. Реализовать нормализацию и группировку.
@@ -216,4 +220,4 @@ npm run package
 - `Kilo Folders`, раскрываемые детали и команды открытия: 1–2 дня;
 - тесты, packaging и smoke test: 1 день.
 
-Если Kilo предоставляет стабильный public API, срок ближе к нижней границе. Если потребуется поддержка нескольких внутренних схем storage, это отдельный объём и риск.
+Срок зависит прежде всего от выбора SQLite runtime для Windows VSIX, корректного WAL-safe read-only доступа и сложности schema guard. Поддержка нескольких несовместимых схем не входит в Step 1.

@@ -2,6 +2,8 @@
 
 Дата анализа: 2026-09-20.
 
+Статус: восемь предложенных корректировок согласованы и внесены в документацию Step 1.
+
 Исходный материал: [`Kilo_Hub_existing_solutions_research.md`](./Kilo_Hub_existing_solutions_research.md).
 
 Управляющие документы: [`01-requirements.md`](../req/step1/01-requirements.md) и [`02-discovery.md`](../req/step1/02-discovery.md).
@@ -21,8 +23,8 @@
 Предлагаемое решение:
 
 1. Не расширять функциональный scope Step 1.
-2. Переутвердить границу данных: читать текущую local Kilo database/environment, а не текущий VS Code profile.
-3. Для поставки одним VSIX сначала проверить metadata-only read-only SQLite adapter; официальный CLI использовать как oracle и optional source.
+2. Использовать согласованную границу данных: текущую local Kilo database/environment, а не текущий VS Code profile.
+3. Для поставки одним VSIX использовать metadata-only read-only SQLite adapter; официальный CLI использовать только как oracle с фиксированным `--max-count 10000`.
 4. Не добавлять runtime-зависимости на исследованные сторонние расширения.
 
 ## 2. Что в исходном исследовании относится к более позднему продукту
@@ -47,18 +49,11 @@
 
 ## 3. Что полезно применить уже в Step 1
 
-### 3.1 Выбирать источник до реализации UI
+### 3.1 Использовать выбранный источник до реализации UI
 
-По стабильности контракта кандидаты располагаются так:
+Для runtime выбран read-only SQLite adapter к локальной `kilo.db`. Официальный CLI применяется только как Discovery oracle с фиксированным `--max-count 10000`. `kilo serve` и private bundled runtime VS Code-расширения не используются.
 
-1. официальный CLI `kilo session list --all --max-count <N> --format json`, если отдельный CLI установлен;
-2. read-only чтение документированной локальной SQLite database, если установлен только VS Code extension;
-3. отдельно запущенный и аутентифицированный `kilo serve` только если процесс уже является частью среды пользователя;
-4. private bundled runtime VS Code-расширения не использовать как контракт.
-
-По удобству поставки VSIX порядок другой: SQLite доступна вместе с локальной историей, а отдельный CLI может отсутствовать. Поэтому runtime-выбор должен быть принят после Windows packaging spike, а не только по качеству интерфейса.
-
-Публичного data API у VS Code-расширения Kilo сейчас нет. Пригодный источник должен возвращать стабильный ID, title, directory, archive/parent state и поддерживать ручное повторное чтение без загрузки transcript. Timestamp желателен, но не является блокером.
+Публичного data API у VS Code-расширения Kilo сейчас нет. SQLite adapter должен возвращать стабильный ID, title, directory, archive/parent state и поддерживать ручное повторное чтение без загрузки transcript. Timestamp желателен, но не является блокером.
 
 ### 3.2 Сохранить границу между источником и UI
 
@@ -85,7 +80,7 @@ interface KiloConversationSource {
 }
 ```
 
-Это нормализованный контракт уже после source-specific filtering. SQLite adapter фильтрует `parent_id` и `time_archived`; CLI adapter получает уже отфильтрованные global results. Соответствие root session понятию «обычный диалог» нужно один раз подтвердить сравнением с Kilo History UI. Удалённый диалог отдельного durable-флага не имеет: после удаления строки нет в источнике.
+Это нормализованный контракт уже после source-specific filtering. SQLite adapter фильтрует `parent_id` и `time_archived`; CLI oracle возвращает уже отфильтрованные global results. Удалённый диалог отдельного durable-флага не имеет: после удаления строки нет в источнике.
 
 ### 3.3 Не добавлять стороннюю runtime-зависимость без необходимости
 
@@ -149,7 +144,7 @@ interface KiloConversationSource {
 kilo session list --all --max-count 10000 --format json
 ```
 
-Важно указывать `--max-count`: default global limit равен 100. JSON содержит `id`, `title`, `updated`, `created`, `projectId`, `directory` и project metadata. По умолчанию global listing уже исключает child sessions и archived sessions. CLI не следует считать полным источником без стратегии обнаружения усечения: spike должен увеличивать limit, пока возвращённое количество меньше него, либо предпочесть SQL без искусственного лимита.
+Важно указывать `--max-count`: default global limit равен 100. Для Step 1 oracle использует фиксированный `--max-count 10000` без автоматического увеличения. JSON содержит `id`, `title`, `updated`, `created`, `projectId`, `directory` и project metadata. По умолчанию global listing уже исключает child sessions и archived sessions.
 
 Ограничения:
 
@@ -160,7 +155,7 @@ kilo session list --all --max-count 10000 --format json
 - documented `kilo serve` требует отдельного запуска и аутентификации;
 - открыть конкретную session через публичный VS Code command нельзя.
 
-**Влияние на Step 1:** требуемая projection технически доступна. Для среды только с VS Code extension наиболее реалистичен read-only SQLite adapter. CLI adapter проще и стабильнее, но может быть только optional fast path либо требует явной зависимости на установленный CLI.
+**Влияние на Step 1:** требуемая projection технически доступна. Runtime-источником выбран read-only SQLite adapter; CLI остаётся только Discovery oracle и не является fast path или runtime fallback.
 
 Ещё одно обязательное изменение предположений: storage не привязан к текущему VS Code profile. Обычно разные локальные профили и Stable/Insiders видят одну local Kilo database, если environment overrides не разделяют их. Корректная граница Step 1 — **текущая локальная Kilo database/environment**, а не текущий профиль VS Code.
 
@@ -223,11 +218,11 @@ source indexers -> shared SQLite index -> desktop / cal CLI / MCP / VS Code clie
 
 | Компонент | Kilo official | Chat Wizard | Callimachus | Решение Step 1 |
 |---|---|---|---|---|
-| Готовый Kilo reader | CLI JSON и documented SQLite | Нет | Legacy task-file indexer | Проверить CLI и SQLite adapters |
+| Готовый Kilo reader | CLI JSON и documented SQLite | Нет | Legacy task-file indexer | Реализовать SQLite adapter; CLI только oracle |
 | Canonical session model | Session schema | Есть | Есть | Взять идею минимального adapter contract |
 | Folder linkage | Обязательное `session.directory` | Зависит от источника | Legacy `task_metadata.json.cwd` | Использовать `directory` |
 | Собственный индекс | Источник истины `kilo.db` | In-memory + SQLite cache | SQLite index | Не создавать Hub index в Step 1 |
-| CLI | `kilo session list` | Нет | Собственный `cal` | Kilo CLI optional; `cal` не использовать |
+| CLI | `kilo session list` | Нет | Собственный `cal` | Только Discovery oracle; `cal` не использовать |
 | MCP/API | `kilo serve`, private VS Code backend | In-process REST/MCP | MCP + CLI | Не добавлять Hub API/MCP |
 | Лицензия для прямого reuse | Не сторонний reuse | Commons Clause ограничивает использование | AGPL или commercial | Сторонний код не копировать без решения |
 
@@ -297,19 +292,20 @@ source indexers -> shared SQLite index -> desktop / cal CLI / MCP / VS Code clie
 
 ### Шаг 2. Подготовить контрольные данные
 
-В отдельном тестовом профиле создать:
+В отдельной изолированной Kilo database/environment, при необходимости через `KILO_DB`, создать:
 
 - два обычных диалога в одной локальной папке;
 - один обычный диалог в другой папке;
 - диалог с изменённым title;
 - malformed fixture с пустым или отсутствующим title для defensive fallback;
-- архивный и удалённый диалог;
+- архивную и дочернюю session;
+- session, которая будет удалена во время проверки `Refresh`;
 - диалог для удалённой с диска папки;
 - неподдерживаемую связь с `.code-workspace` или remote context, если это безопасно воспроизвести.
 
-### Шаг 3. Проверить кандидатов источника
+### Шаг 3. Проверить SQLite adapter
 
-Для каждого API, CLI, IPC или storage-кандидата зафиксировать:
+Для выбранного SQLite adapter зафиксировать:
 
 | Проверка | Ожидаемый результат |
 |---|---|
@@ -332,16 +328,16 @@ source indexers -> shared SQLite index -> desktop / cal CLI / MCP / VS Code clie
 | Partial result | Повреждённая строка не скрывает корректные записи |
 | Performance | 1 000 диалогов не блокируют Extension Host заметно |
 
-### Шаг 4. Выбрать адаптер
+### Шаг 4. Зафиксировать решение по адаптеру
 
 Решение фиксируется короткой ADR-таблицей:
 
 | Кандидат | Поля | Стабильность | Read-only | Риски | Решение |
 |---|---|---|---|---|---|
 | VS Code exported API | Данных нет | Не предоставляется | — | Отсутствует | Отклонён |
-| Official CLI JSON | Все нужные metadata | Документирован | Да | CLI может быть не установлен | Проверить как optional source/oracle |
+| Official CLI JSON | Все нужные metadata | Документирован | Да | CLI может быть не установлен | Использовать только как Discovery oracle |
 | `kilo serve` | Session API | Документирован | Только выбранные read endpoints | Отдельный процесс и auth | Не использовать в Step 1 по умолчанию |
-| SQLite `kilo.db` | Все нужные metadata | Официальное storage, внутренняя versioned schema | При `mode=ro` | WAL, locking, schema changes, SQLite packaging | Основной кандидат для VSIX-only среды |
+| SQLite `kilo.db` | Все нужные metadata | Официальное storage, внутренняя versioned schema | При `mode=ro` | WAL, locking, schema changes, SQLite packaging | Выбранный runtime-источник Step 1 |
 
 ### Шаг 5. Проверить UI prototype
 
@@ -356,13 +352,13 @@ source indexers -> shared SQLite index -> desktop / cal CLI / MCP / VS Code clie
 
 ### Шаг 6. Stop condition
 
-Контрактный blocker снят: официальная schema содержит обязательный `session.directory`. Для выбранного VSIX-only/SQLite маршрута реализация остаётся заблокированной, пока local spike не подтвердит безопасное read-only чтение в Extension Host. Альтернатива с обязательным отдельным CLI требует отдельного продуктового решения. Нельзя молча заменять источник на `Open Recent`, сканирование диска или ручной реестр.
+Контрактный blocker снят: официальная schema содержит обязательный `session.directory`. Реализация остаётся заблокированной, пока local SQLite spike не подтвердит безопасное read-only чтение в Extension Host. Нельзя молча заменять источник на CLI runtime, `Open Recent`, сканирование диска или ручной реестр.
 
 ## 6. Предложения по архитектуре Step 1
 
 ### Рекомендация 1. Не расширять функциональный scope
 
-Рыночные аналоги показывают ценность поиска и общей истории, но не делают эти функции необходимыми для проверки первого пользовательского сценария: увидеть папки с Kilo-активностью и открыть нужную. При этом границу данных «текущий профиль VS Code» нужно отдельно переутвердить: фактический источник является общей local Kilo database/environment.
+Рыночные аналоги показывают ценность поиска и общей истории, но не делают эти функции необходимыми для проверки первого пользовательского сценария: увидеть папки с Kilo-активностью и открыть нужную. Граница данных согласована как общая local Kilo database/environment, а не текущий профиль VS Code.
 
 ### Рекомендация 2. Реализовывать UI только после source spike
 
@@ -382,7 +378,7 @@ source indexers -> shared SQLite index -> desktop / cal CLI / MCP / VS Code clie
 
 ### Рекомендация 6. Для VSIX-only среды проверить SQLite первым
 
-Пользователь не должен устанавливать отдельный CLI только ради Hub, если исходное условие поставки — VSIX рядом с Kilo extension. Поэтому основной spike должен проверить прямой read-only запрос только к таблице `session`. Официальный CLI следует использовать как oracle: результаты SQL adapter и `kilo session list --all --format json` на одной базе должны совпадать.
+Пользователь не должен устанавливать отдельный CLI только ради Hub, если исходное условие поставки — VSIX рядом с Kilo extension. Поэтому основной spike должен проверить прямой read-only запрос только к таблице `session`. На изолированной тестовой базе с менее чем 10 000 подходящих sessions результаты SQL adapter и `kilo session list --all --max-count 10000 --format json` должны совпадать.
 
 Отдельно нужно выбрать способ SQLite-доступа, совместимый с Extension Host и Windows packaging. Варианты сравниваются по ABI, размеру VSIX, поддержке x64/arm64, read-only/WAL semantics и минимальной версии VS Code. Решение не следует принимать только по удобству локальной разработки.
 
@@ -410,15 +406,15 @@ source indexers -> shared SQLite index -> desktop / cal CLI / MCP / VS Code clie
 
 Если runtime adapter не сможет безопасно прочитать подтверждённые metadata, это риск или блокер, а не автоматическое разрешение добавить `Open Recent`, ручной список, transcript indexing или собственную базу.
 
-### Уже подтверждённые корректировки
+### Согласованные корректировки
 
-До реализации рекомендуется отдельно согласовать и затем синхронно внести в документы Step 1:
+Согласовано и внесено в документы Step 1:
 
-1. Заменить «текущий профиль и текущая установка VS Code» на «текущая локальная Kilo database/environment».
-2. Зафиксировать `session.directory` как связь с папкой, а `session.id` как ID диалога.
-3. Подтвердить по Kilo History UI и затем определить обычный диалог как root session без `parent_id` и `time_archived`.
-4. Уточнить, что удалённый диалог исчезает из источника и отдельного deleted-state не имеет.
-5. Зафиксировать SQLite `kilo.db` как основной кандидат для VSIX-only среды и CLI JSON как optional source и проверочный oracle.
-6. Убрать legacy `globalStorage/kilocode.kilo-code/tasks/*.json` из кандидатов актуального источника.
-7. Для CLI spike добавить обнаружение усечения результатов: default global limit равен 100, а фиксированный произвольный limit не гарантирует полную историю.
-8. Сохранить fallback `Без названия` только как defensive обработку повреждённой или несовместимой записи: в текущей schema title обязательный.
+1. Граница данных — текущая локальная Kilo database/environment, а не профиль VS Code.
+2. `session.directory` — связь с папкой, `session.id` — ID диалога.
+3. Обычный диалог — root session с `parent_id IS NULL` и `time_archived IS NULL`.
+4. Удалённая session исчезает из Hub после `Refresh`; собственного tombstone/archive Hub нет.
+5. Runtime-источник — read-only SQLite `kilo.db`; CLI используется только как Discovery oracle.
+6. Минимальная версия — Kilo 7.7.5; legacy task-файлы не поддерживаются.
+7. CLI oracle использует фиксированный `--max-count 10000` без автоматического увеличения.
+8. Пустой title получает defensive fallback `Без названия` и предупреждение в Output Channel.
