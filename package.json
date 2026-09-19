@@ -1,0 +1,112 @@
+{
+  "name": "kilo-hub",
+  "displayName": "Kilo Hub",
+  "description": "Локальный read-only список папок с диалогами Kilo Code.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.105.1"
+  },
+  "categories": [
+    "Other"
+  ],
+  "extensionKind": [
+    "ui"
+  ],
+  "main": "./build/extension.js",
+  "activationEvents": [
+    "onView:kiloHub.folders",
+    "onCommand:kiloHub.refresh"
+  ],
+  "files": [
+    "build/extension.js",
+    "docs/release-notes.md",
+    "resources/**"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "kiloHub",
+          "title": "Kilo Hub",
+          "icon": "resources/hub.svg"
+        }
+      ]
+    },
+    "views": {
+      "kiloHub": [
+        {
+          "id": "kiloHub.folders",
+          "name": "Kilo Folders",
+          "visibility": "visible"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "kiloHub.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "kiloHub.openHere",
+        "title": "Open Here"
+      },
+      {
+        "command": "kiloHub.openNewWindow",
+        "title": "Open in New Window"
+      },
+      {
+        "command": "kiloHub.openInFileExplorer",
+        "title": "Open in File Explorer"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "kiloHub.refresh",
+          "when": "view == kiloHub.folders",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "kiloHub.openHere",
+          "when": "false"
+        },
+        {
+          "command": "kiloHub.openNewWindow",
+          "when": "false"
+        },
+        {
+          "command": "kiloHub.openInFileExplorer",
+          "when": "false"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src tests scripts",
+    "bundle": "node scripts/build.mjs",
+    "build:tests": "tsc -p tsconfig.tests.json",
+    "test:unit": "npm run build:tests && node scripts/run-unit-tests.mjs",
+    "test": "npm run check-types && npm run lint && npm run test:unit",
+    "verify:vsix": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-vsix.ps1",
+    "package": "npm run bundle && node scripts/package.mjs && npm run verify:vsix"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.4",
+    "@types/vscode": "1.105.0",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "4.0.0",
+    "esbuild": "0.28.2",
+    "eslint": "10.11.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0"
+  }
+}

@@ -1,0 +1,11 @@
+node_modules/
+build/
+build-tests/
+coverage/
+.vscode-test/
+*.log
+
+# В dist хранится только итоговый VSIX, который явно добавляется в релизный коммит.
+dist/*
+!dist/.gitkeep
+!dist/*.vsix
