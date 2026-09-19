@@ -28,7 +28,7 @@
 - [x] Подтверждены реальное расположение и schema `kilo.db` на основании read-only данных.
 - [ ] Выбран и доказан SQLite runtime внутри упакованного расширения: `node:sqlite` выбран, Extension Host/VSIX proof ещё не выполнен.
 - [x] Реализованы metadata adapter и domain projection.
-- [ ] Реализованы Activity Bar view и команды.
+- [x] Реализованы Activity Bar view и команды.
 - [ ] Завершены автоматические тесты и независимое ревью.
 - [ ] VSIX собран, проверен, установлен и прошёл smoke test.
 - [ ] Здесь опубликованы точный путь и checksum итогового артефакта.

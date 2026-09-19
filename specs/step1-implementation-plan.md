@@ -92,12 +92,12 @@ dist/      только итоговые версионированные VSIX
 
 ### I4. Нативный UI и команды
 
-- [ ] Зарегистрировать контейнер Activity Bar и дерево `Kilo Folders`.
-- [ ] Выполнять lazy-load при первом показе view и повторное чтение по `Refresh`.
-- [ ] Показывать folder, path, три action nodes и conversation nodes в требуемом порядке.
-- [ ] Реализовать `Open Here`, `Open in New Window` и `Open in File Explorer`.
-- [ ] Блокировать открытие missing paths и показывать понятные ошибки.
-- [ ] Показывать ошибки источника в view/user notification, а технические подробности — в Output `Kilo Hub`.
+- [x] Зарегистрировать контейнер Activity Bar и дерево `Kilo Folders`.
+- [x] Выполнять lazy-load при первом показе view и повторное чтение по `Refresh`.
+- [x] Показывать folder, path, три action nodes и conversation nodes в требуемом порядке.
+- [x] Реализовать `Open Here`, `Open in New Window` и `Open in File Explorer`.
+- [x] Блокировать открытие missing paths и показывать понятные ошибки.
+- [x] Показывать ошибки источника в view/user notification, а технические подробности — в Output `Kilo Hub`.
 
 ## Этап V: Проверка
 
