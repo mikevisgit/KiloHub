@@ -34,24 +34,24 @@ dist/      только итоговые версионированные VSIX
 
 ### D1. Среда и расположение storage
 
-- [ ] Найти активную `kilo.db` Kilo 7.7.5, не изменяя её.
-- [ ] По первичным доказательствам описать стандартный путь Windows и поддерживаемые overrides `KILO_DB`/`XDG_DATA_HOME`/channel.
-- [ ] Задать однозначный приоритет путей и ошибки отсутствующего или недоступного источника.
+- [x] Найти активную `kilo.db` Kilo 7.7.5, не изменяя её.
+- [x] По первичным доказательствам описать стандартный путь Windows и поддерживаемые overrides `KILO_DB`/`XDG_DATA_HOME`/channel.
+- [x] Задать однозначный приоритет путей и ошибки отсутствующего или недоступного источника.
 
 Доказательство: `docs/kilo-storage-discovery.md`.
 
 ### D2. Контракт schema
 
-- [ ] Записать столбцы и типы таблицы `session`, а также относящиеся к ней metadata версии.
-- [ ] Подтвердить timestamps и единицы измерения.
-- [ ] Определить schema guard по обязательным столбцам и совместимой семантике.
-- [ ] Подтвердить точный metadata-only запрос root/non-archived sessions.
+- [x] Записать столбцы и типы таблицы `session`, а также относящиеся к ней metadata версии.
+- [x] Подтвердить timestamps и единицы измерения.
+- [x] Определить schema guard по обязательным столбцам и совместимой семантике.
+- [x] Подтвердить точный metadata-only запрос root/non-archived sessions.
 
 Доказательство: обезличенная schema fixture и `docs/kilo-storage-discovery.md`.
 
 ### D3. Проверка SQLite runtime
 
-- [ ] Выбрать runtime, совместимый с поддерживаемым Extension Host VS Code.
+- [x] Выбрать runtime, совместимый с поддерживаемым Extension Host VS Code: кандидат `node:sqlite` и VS Code `1.105.1`.
 - [ ] Доказать read-only открытие, видимость WAL, busy handling и освобождение connection.
 - [ ] Доказать работоспособность runtime после production bundling и упаковки VSIX.
 - [ ] Зафиксировать минимальную версию VS Code по результатам выбора runtime.
@@ -70,9 +70,9 @@ dist/      только итоговые версионированные VSIX
 
 ### I1. Каркас расширения
 
-- [ ] Добавить manifest, конфигурацию TypeScript/build/lint/test/package, иконку и license/notice.
-- [ ] Объявить только view и команды Step 1.
-- [ ] Сделать allow-list упаковки минимальным.
+- [ ] Добавить manifest, конфигурацию TypeScript/build/lint/test/package, иконку и license metadata. Файлы созданы, verification ожидает production entrypoint.
+- [ ] Объявить только view и команды Step 1. Contributions добавлены, manifest test ещё не выполнен.
+- [ ] Сделать allow-list упаковки минимальным. Allow-list и ZIP verifier добавлены, package ещё не собран.
 
 ### I2. Data adapter
 
