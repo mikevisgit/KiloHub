@@ -22,7 +22,7 @@
 | Уровень | Среда | Что считается доказательством |
 |---|---|---|
 | Unit | Обезличенные объекты и fixtures в `tests/` | Имя теста, ожидаемое и фактическое значение, успешный test report |
-| Integration | Временная копия SQLite fixture; для UI — поддерживаемый VS Code Extension Host | Test report, логи Output Channel без пользовательского содержимого, fingerprints тестовых файлов при проверке read-only |
+| Integration | Временная копия SQLite fixture; для UI — поддерживаемый VS Code Extension Host | Test report, логи Output Channel без пользовательского содержимого, fingerprints DB/WAL и логических данных при проверке read-only; технические read-marks SHM оцениваются отдельно |
 | Packaging | Чистая установка зависимостей и production-сборка | Успешные команды, список файлов VSIX, проверка runtime-зависимостей, имя и SHA-256 пакета |
 | Manual smoke | Отдельный VS Code profile, отдельный каталог extensions и изолированная Kilo environment | Версии среды, пошаговый протокол, ожидаемый и фактический результат, обезличенные снимки UI при необходимости |
 
@@ -106,10 +106,10 @@
 | I-007 | Повреждённая DB | Malformed SQLite fixture | Нет падения Extension Host; connection/resources освобождены; доступен повторный `Refresh` | V2, AC-15 |
 | I-008 | Metadata-only SQL | Инструментировать подготовленные statements/SQLite authorizer | Обращение только к разрешённой schema metadata и нужным столбцам `session`; таблицы сообщений не читаются; write opcodes запрещены | FR-1, D2, privacy NFR |
 | I-009 | Read-only open | Открыть fixture через production adapter; попытка write через ту же connection в тестовом probe | Режим connection read-only; write отклонён SQLite; adapter не выполняет migration/PRAGMA с записью | FR-1, AC-10, V2 |
-| I-010 | Неизменность DB без writer | Зафиксировать размер и SHA-256 DB/WAL/SHM и список файлов каталога до и после load/refresh/deactivate | DB/WAL/SHM побайтово неизменны; новые journal/sidecar/temp files не созданы | AC-10, V2 |
+| I-010 | Неизменность DB без writer | Зафиксировать размер и SHA-256 DB/WAL, logical session set, размер SHM и список файлов каталога до и после load/refresh/deactivate | DB/WAL и sessions побайтово/логически неизменны; новые journal/sidecar/temp files не созданы. Существующий SHM может изменить технические read-marks SQLite без изменения данных Kilo | AC-10, V2 |
 | I-011 | Read-only каталог | Скопировать полный WAL fixture в каталог без права записи и открыть production adapter | Чтение успешно, если runtime-контракт допускает существующие sidecars; никакой файл не создаётся. Иначе runtime отклоняется на D3 | D3, read-only NFR |
 | I-012 | Видимость committed WAL | Writer создаёт подтверждённую transaction только в WAL и остаётся открытым; затем reader выполняет refresh | Новая session видна целиком; нет partial result или `SQLITE_BUSY` при штатном режиме | D3, V2, WAL NFR |
-| I-013 | Атрибуция изменений WAL | После writer commit приостановить writer, снять fingerprints DB/WAL/SHM и список файлов, выполнить только Hub read, снять повторно | Hub не меняет содержимое DB/WAL/SHM и не создаёт файлы; изменения отдельного writer не считаются изменениями Hub | AC-10, V2 |
+| I-013 | Атрибуция изменений WAL | После writer commit приостановить writer, снять fingerprints DB/WAL и logical sessions, размер SHM и список файлов, выполнить только Hub read, снять повторно | Hub не меняет DB/WAL или sessions и не создаёт файлы; изменения read-marks существующего SHM допустимы, изменения writer атрибутируются отдельно | AC-10, V2 |
 | I-014 | Concurrent commit во время чтения | Координировать длинное чтение и вторую writer transaction | Reader возвращает один согласованный snapshot; следующий refresh видит committed изменение | Discovery concurrency, FR-6 |
 | I-015 | Busy/locked | Удерживать блокировку, вызывающую подтверждённый для runtime busy path | Ограниченное ожидание/ошибка без зависания; connection закрыта; понятная ошибка и возможность retry | D3, V2, AC-15 |
 | I-016 | Освобождение ресурсов | Success, schema error, malformed row, busy, refresh и deactivate | Все statements/connections закрыты; fixture можно переместить/удалить на Windows после завершения | I2, D3 |
@@ -117,7 +117,7 @@
 | I-018 | CLI oracle | Сравнить adapter с `kilo session list --all --max-count 10000 --format json` на `F-CLI` | Совпадают `id`, `title`, `directory` и root/non-archived состав после документированной normalization; расхождение блокирует приёмку | Discovery §5, DoD |
 | I-019 | 1 000 sessions | Загрузить `F-1000` production adapter и projection; измерить wall time и event-loop delay по заранее зафиксированному бюджету D3 | Все ожидаемые sessions обработаны; Extension Host не имеет заметной блокировки; метрики и машина записаны | NFR performance, V1 |
 
-Для `I-010` и `I-013` fingerprints снимаются только в стабильных контрольных точках. Активный writer должен быть приостановлен барьером; иначе изменение WAL нельзя достоверно приписать reader или writer. Проверка файлов дополняет, но не заменяет явный SQLite read-only mode и запрет write statements.
+Для `I-010` и `I-013` fingerprints снимаются только в стабильных контрольных точках. Активный writer должен быть приостановлен барьером; иначе изменение WAL нельзя достоверно приписать reader или writer. SQLite WAL reader может обновить lock/read-mark bytes в существующем `-shm`; это не изменение sessions и не нарушение read-only connection. Проверка файлов дополняет, но не заменяет явный SQLite read-only mode и запрет write statements.
 
 ### 5.2 Extension Host и UI contract
 
@@ -189,7 +189,7 @@
 | M-016 | На available folder вызвать `Open in File Explorer` | Windows Explorer открывает выбранную folder | Фактический Explorer path | AC-12 |
 | M-017 | Держать Kilo открытым, выполнить create/rename и Hub refresh | Hub читает согласованные committed данные без повреждения и заметного влияния на Kilo | Протокол операций и Output | WAL/concurrency NFR |
 | M-018 | Открыть fixture с 100 папками и 1 000 sessions, раскрыть несколько folders и вызвать refresh | UI остаётся отзывчивым, список полон и сортировка стабильна; фактические метрики сопоставлены с бюджетом `I-019` | Метрики и контрольные counts | Performance NFR |
-| M-019 | После всех read/refresh операций повторно снять fingerprints | При отсутствии тестового writer DB/WAL/SHM и список файлов не изменились Hub; при writer-сценарии изменения соответствуют только заранее записанным операциям writer | SHA-256, размеры, file list, журнал writer | AC-10 |
+| M-019 | После всех read/refresh операций повторно снять fingerprints | При отсутствии test writer DB/WAL и logical sessions не изменились, новые sidecars не созданы; изменение технических read-marks существующего SHM допустимо. При writer-сценарии изменения данных соответствуют только заранее записанным операциям writer | SHA-256 DB/WAL, logical rows, размер SHM, file list, журнал writer | AC-10 |
 | M-020 | Осмотреть toolbar, folder items, context menus и Command Palette | Есть только `Refresh` и три нормативных folder actions в предусмотренных местах; нет inline/context действий folder, add/remove/hide/import/copy | Снимки/перечень команд | AC-11, UI §5.3 |
 | M-021 | Выбрать conversation node | Никакой dialog, webview или файл не открывается | Протокол | Excluded «открытие диалога» |
 

@@ -48,6 +48,13 @@ function readFixture(databasePath: string, overrides: { kiloVersion?: string; on
   });
 }
 
+function snapshotFiles(directory: string): Map<string, Buffer> {
+  return new Map(readdirSync(directory).sort().map((name) => [
+    name,
+    readFileSync(join(directory, name)),
+  ]));
+}
+
 after(() => {
   for (const directory of tempDirectories) {
     rmSync(directory, { recursive: true, force: true });
@@ -235,8 +242,33 @@ void test('sees a committed transaction that remains in WAL', () => {
       INSERT INTO session VALUES ('wal-session', 'WAL title', 'C:\\wal', NULL, 1000, 2000, NULL);`);
 
     assert.equal(existsSync(`${databasePath}-wal`), true);
+    const before = snapshotFiles(win32.dirname(databasePath));
     assert.deepEqual(readFixture(databasePath).map(({ id }) => id), ['wal-session']);
+    const after = snapshotFiles(win32.dirname(databasePath));
+    assert.deepEqual([...after.keys()], [...before.keys()]);
+    assert.deepEqual(after.get('kilo.db'), before.get('kilo.db'));
+    assert.deepEqual(after.get('kilo.db-wal'), before.get('kilo.db-wal'));
+    assert.equal(after.get('kilo.db-shm')?.length, before.get('kilo.db-shm')?.length);
   } finally {
+    writer.close();
+  }
+});
+
+void test('bounds SQLITE_BUSY waiting under an exclusive lock', () => {
+  const databasePath = createDatabase();
+  const writer = new DatabaseSync(databasePath);
+  try {
+    writer.exec('BEGIN EXCLUSIVE');
+    const startedAt = performance.now();
+    assert.throws(
+      () => readFixture(databasePath),
+      /busy|locked/i,
+    );
+    const elapsed = performance.now() - startedAt;
+    assert.ok(elapsed >= 4_500, `busy timeout завершился слишком рано: ${elapsed} ms`);
+    assert.ok(elapsed < 7_500, `busy timeout превысил допустимую границу: ${elapsed} ms`);
+  } finally {
+    writer.exec('ROLLBACK');
     writer.close();
   }
 });

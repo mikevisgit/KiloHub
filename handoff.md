@@ -26,7 +26,7 @@
 - [x] Зафиксированы границы отдельных каталогов.
 - [x] Запущены независимые исследования SQLite, UI и packaging.
 - [x] Подтверждены реальное расположение и schema `kilo.db` на основании read-only данных.
-- [ ] Выбран и доказан SQLite runtime внутри упакованного расширения: `node:sqlite` выбран, Extension Host/VSIX proof ещё не выполнен.
+- [ ] Выбран и доказан SQLite runtime внутри упакованного расширения: `node:sqlite` и production bundle доказаны в Extension Host `1.105.1`; установленный VSIX proof ещё не выполнен.
 - [x] Реализованы metadata adapter и domain projection.
 - [x] Реализованы Activity Bar view и команды.
 - [ ] Завершены автоматические тесты и независимое ревью.
@@ -40,7 +40,10 @@
 - `git diff --check` проходит для текущих текстовых изменений.
 - `npm run test:unit` прошёл для domain projection: 9/9 tests, включая 1 000 sessions в 100 folders.
 - `npm run check-types` и `npm run lint` проходят после интеграции projection.
-- Изолированный adapter suite прошёл 12/12 tests: resolver, schema/version guard, row isolation, read-only/query-only, WAL visibility и освобождение файла.
+- Изолированный adapter suite прошёл 13/13 top-level/subtests: resolver, schema/version guard, row isolation, read-only/query-only, WAL visibility, busy timeout и освобождение файла.
+- Финальный до packaging прогон `npm test` прошёл: typecheck, ESLint, 22 unit tests и Extension Host test на VS Code `1.105.1`.
+- Extension Host подтвердил Node `22.19.0`, Electron `37.6.0`, загрузку `node:sqlite`, четыре command IDs, view contract, tree contract и неизменность fixture DB.
+- Exclusive-lock тест подтвердил bounded `SQLITE_BUSY` примерно за 7 секунд при настроенном SQLite timeout `5000 ms`.
 
 ## Решения
 
@@ -65,6 +68,7 @@
 - Если будет выбрана native-зависимость, она должна совпадать с Electron/Node ABI поддерживаемого VS Code.
 - Полная UI-проверка может заменить текущий workspace, поэтому установка и действия проверяются в изолированном профиле и окне.
 - Версию создателя общей базы нельзя без доказательств выводить из версии установленного VS Code extension; compatibility должен определяться подтверждённой schema signature либо metadata самой базы.
+- Read-only WAL reader может обновлять технические read-marks в существующем `kilo.db-shm`. Проверки доказывают неизменность `kilo.db`, WAL и logical sessions; byte identity SHM не заявляется как свойство SQLite.
 
 ## Следующее действие
 

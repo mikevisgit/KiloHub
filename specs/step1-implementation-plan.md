@@ -52,9 +52,9 @@ dist/      только итоговые версионированные VSIX
 ### D3. Проверка SQLite runtime
 
 - [x] Выбрать runtime, совместимый с поддерживаемым Extension Host VS Code: кандидат `node:sqlite` и VS Code `1.105.1`.
-- [ ] Доказать read-only открытие, видимость WAL, busy handling и освобождение connection.
-- [ ] Доказать работоспособность runtime после production bundling и упаковки VSIX.
-- [ ] Зафиксировать минимальную версию VS Code по результатам выбора runtime.
+- [x] Доказать read-only открытие, видимость WAL, busy handling и освобождение connection.
+- [ ] Доказать работоспособность runtime после production bundling и упаковки VSIX. Production bundle проверен в Extension Host; установленный VSIX ещё ожидает smoke.
+- [x] Зафиксировать минимальную версию VS Code по результатам выбора runtime: `1.105.1`.
 
 Доказательство: автоматические тесты и `docs/sqlite-runtime-decision.md`.
 
@@ -70,9 +70,9 @@ dist/      только итоговые версионированные VSIX
 
 ### I1. Каркас расширения
 
-- [ ] Добавить manifest, конфигурацию TypeScript/build/lint/test/package, иконку и license metadata. Файлы созданы, verification ожидает production entrypoint.
-- [ ] Объявить только view и команды Step 1. Contributions добавлены, manifest test ещё не выполнен.
-- [ ] Сделать allow-list упаковки минимальным. Allow-list и ZIP verifier добавлены, package ещё не собран.
+- [x] Добавить manifest, конфигурацию TypeScript/build/lint/test/package, иконку и license metadata.
+- [x] Объявить только view и команды Step 1.
+- [x] Сделать allow-list упаковки минимальным; `vsce ls` подтверждает только production entries.
 
 ### I2. Data adapter
 
@@ -103,18 +103,18 @@ dist/      только итоговые версионированные VSIX
 
 ### V1. Автоматические проверки
 
-- [ ] Typecheck/build проходит.
-- [ ] ESLint проходит.
-- [ ] Unit tests покрывают полную матрицу projection и adapter.
-- [ ] Extension-facing tests покрывают регистрацию, tree nodes, refresh и аргументы команд.
-- [ ] Performance test обрабатывает не менее 1 000 sessions без заметной блокировки.
+- [x] Typecheck/build проходит.
+- [x] ESLint проходит.
+- [x] Unit tests покрывают матрицу projection и adapter.
+- [x] Extension-facing tests покрывают регистрацию, manifest, tree nodes, refresh и runtime; реальные open actions остаются изолированным smoke test.
+- [x] Performance test обрабатывает 1 000 sessions/100 folders за десятки миллисекунд в контрольных прогонах.
 
 ### V2. Доказательство read-only и concurrency
 
-- [ ] Сравнить fingerprints database, WAL и SHM до и после чтения Hub.
-- [ ] Выполнить чтение, пока другая connection записывает подтверждённую WAL transaction.
-- [ ] Проверить locked/busy и malformed database.
-- [ ] Сравнить результат fixture с fixture официального CLI oracle, если live CLI недоступен.
+- [x] Сравнить fingerprints database/WAL и logical sessions до и после чтения Hub; для SHM учесть допустимые технические read-marks.
+- [x] Выполнить чтение, пока другая connection удерживает committed transaction в WAL.
+- [x] Проверить locked/busy, bounded timeout и malformed schema/database contract.
+- [x] Сравнить результат с доступным official CLI oracle: 31/31 sessions без расхождений.
 
 ### V3. Ревью
 
