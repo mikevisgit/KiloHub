@@ -237,6 +237,9 @@ export async function projectSessions(
     } else if (existing.directory.key !== candidate.directory.key) {
       bySessionId.delete(candidate.session.id);
       ambiguousSessionIds.add(candidate.session.id);
+      options.onWarning?.(
+        `Session "${candidate.session.id}" имеет конфликтующие directory; запись пропущена.`,
+      );
     } else {
       bySessionId.set(
         candidate.session.id,

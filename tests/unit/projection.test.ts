@@ -108,19 +108,26 @@ void test('uses untitled fallback and invokes the warning callback once', async 
 });
 
 void test('deduplicates by session id and excludes an ambiguous cross-folder id', async () => {
+  const warnings: string[] = [];
   const folders = await projectSessions([
     session('duplicate', 'C:\\repo', { title: 'Old', timeUpdated: 100 }),
     session('duplicate', 'c:/REPO', { title: 'New', timeUpdated: 200 }),
     session('ambiguous', 'C:\\repo'),
     session('ambiguous', 'D:\\repo'),
     session('kept', 'D:\\repo'),
-  ], { isDirectoryAvailable: available });
+  ], {
+    isDirectoryAvailable: available,
+    onWarning: (warning) => warnings.push(warning),
+  });
 
   assert.deepEqual(folders.flatMap(({ conversations }) => conversations.map(({ id }) => id)), [
     'duplicate',
     'kept',
   ]);
   assert.equal(folders[0].conversations[0].title, 'New');
+  assert.deepEqual(warnings, [
+    'Session "ambiguous" имеет конфликтующие directory; запись пропущена.',
+  ]);
 });
 
 void test('sorts known timestamps first, then names and ids deterministically', async () => {

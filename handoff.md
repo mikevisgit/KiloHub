@@ -27,7 +27,7 @@
 - [x] Запущены независимые исследования SQLite, UI и packaging.
 - [x] Подтверждены реальное расположение и schema `kilo.db` на основании read-only данных.
 - [ ] Выбран и доказан SQLite runtime внутри упакованного расширения: `node:sqlite` выбран, Extension Host/VSIX proof ещё не выполнен.
-- [ ] Реализованы metadata adapter и domain projection.
+- [x] Реализованы metadata adapter и domain projection.
 - [ ] Реализованы Activity Bar view и команды.
 - [ ] Завершены автоматические тесты и независимое ревью.
 - [ ] VSIX собран, проверен, установлен и прошёл smoke test.
@@ -38,6 +38,9 @@
 - `npm install` создал lockfile с точными dev dependencies.
 - После удаления `@vscode/test-cli` и обновления `esbuild` команда `npm audit` сообщает `0 vulnerabilities`.
 - `git diff --check` проходит для текущих текстовых изменений.
+- `npm run test:unit` прошёл для domain projection: 9/9 tests, включая 1 000 sessions в 100 folders.
+- `npm run check-types` и `npm run lint` проходят после интеграции projection.
+- Изолированный adapter suite прошёл 12/12 tests: resolver, schema/version guard, row isolation, read-only/query-only, WAL visibility и освобождение файла.
 
 ## Решения
 
