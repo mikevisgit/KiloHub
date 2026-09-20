@@ -63,11 +63,43 @@ Secure-TLS audit сообщает `0 vulnerabilities`; production runtime depend
 
 ## Packaging gate
 
-Итоговые значения будут внесены после clean package commit:
+- Source commit: `e777265 fix: address Step 1 review findings`.
+- VSIX: `D:\VSCode\KiloHub\dist\kilo-hub-0.1.0-win32-x64.vsix`.
+- Размер: `12857` bytes.
+- SHA-256 первой clean сборки: `13AC15017C69D333E0B370770961473D1DC5FAEFD6459B7FD88BF15510F67743`.
+- SHA-256 второй clean сборки: `13AC15017C69D333E0B370770961473D1DC5FAEFD6459B7FD88BF15510F67743`.
+- `npm run verify:vsix`: пройден, проверены exact entries, manifests, target и hashes обоих bundles.
+- `npm run test:installed`: пройден на VS Code `1.105.1`; загружен harness как development extension, а `local.kilo-hub@0.1.0` установлен из проверенного VSIX в отдельный extensions directory. Refresh успешно использовал packaged worker.
+- Hashes установленных `extension.js` и `kiloDataWorker.js` совпали с fresh build: `16F4DD70...72CA` и `19E53E44...4356`.
+- VS Code Stable `1.138.0`: isolated install прошёл, `--list-extensions --show-versions` вернул `local.kilo-hub@0.1.0`.
 
-- source commit: ожидается;
-- VSIX path: ожидается;
-- размер: ожидается;
-- SHA-256 двух последовательных сборок: ожидается;
-- exact ZIP entries: ожидается;
-- установка и installed Extension Host smoke: ожидается.
+Exact entries:
+
+```text
+[Content_Types].xml
+extension.vsixmanifest
+extension/LICENSE.txt
+extension/build/extension.js
+extension/build/kiloDataWorker.js
+extension/docs/release-notes.md
+extension/package.json
+extension/resources/hub.svg
+```
+
+## Release команды
+
+```powershell
+$env:NODE_TLS_REJECT_UNAUTHORIZED='1'
+npm ci
+npm audit --audit-level=high
+npm test
+npm run package
+npm run package
+npm run test:installed
+```
+
+Результат: audit `0 vulnerabilities`, 27/27 tests, development и installed Extension Host exit code `0`, два VSIX hash совпали.
+
+## Ручные ограничения
+
+Стандартные вызовы `vscode.openFolder` проверены по exact options, а Explorer использует `vscode.env.openExternal(fileUri)` после повторной local-directory проверки. Автоматический installed smoke намеренно не выполняет реальные переходы окон, чтобы не завершать test host и не оставлять окна/Explorer. Визуальный клик-тест трёх действий остаётся ручным эксплуатационным smoke, а не блокером целостности package/runtime.

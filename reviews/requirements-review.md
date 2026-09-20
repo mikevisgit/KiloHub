@@ -197,3 +197,21 @@
 - `git diff --check` — exit code `0`; только предупреждения LF/CRLF.
 
 Повторное ревью закрывает M-1, L-1 и L-2. Общая приёмка Step 1 остаётся открытой до clean package rebuild, успешного exact VSIX verification и installed smoke именно нового worker-содержащего артефакта.
+
+## Финальная проверка clean VSIX
+
+Package blocker из предыдущего раздела **закрыт** на commit `e777265`.
+
+- `npm test` прошёл единым финальным прогоном: typecheck, ESLint, 27/27 unit tests и Extension Host VS Code `1.105.1`, exit code `0`.
+- Schema guard теперь требует для `session.id` реальную primary-key semantics (`pk > 0`), а отрицательный тест отклоняет `id TEXT NOT NULL` без PRIMARY KEY: `src/kiloDataSource.ts:26-36`, `src/kiloDataSource.ts:178-215`, `tests/unit/kiloDataSource.test.ts:176-211`.
+- Metadata-only live worker успешно прочитал `31` root/non-archived sessions из текущей совместимой Kilo DB.
+- `npm run verify:vsix` прошёл exact allow-list и сверку current bundle: пакет содержит восемь entries, включая `extension/build/kiloDataWorker.js`; размер `12857` bytes, SHA-256 `13AC15017C69D333E0B370770961473D1DC5FAEFD6459B7FD88BF15510F67743`.
+- `npm run test:installed` прошёл: runner сначала повторно проверил этот VSIX, установил его в изолированные profile/extensions directories, подтвердил `local.kilo-hub@0.1.0` и завершил installed Extension Host test с code `0`.
+
+Остаются только residual manual gaps, которые automated runner намеренно не закрывает:
+
+- визуальный осмотр Activity Bar, collapsed/expanded tree, порядка path/actions/conversations, длинных и non-ASCII titles, tooltips, missing и error states;
+- фактические действия `Open Here`, `Open in New Window` и `Open in File Explorer` в изолированных окнах, включая блокировку missing path;
+- ручной UI-flow create/rename/delete/delete-last + `Refresh` и выбор conversation node без навигации.
+
+Итог: code findings и package/installed worker blocker закрыты; residual scope ограничен ручным визуальным и action smoke.

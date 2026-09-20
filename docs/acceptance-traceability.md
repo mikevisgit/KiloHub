@@ -2,13 +2,13 @@
 
 ## Статус
 
-Production-код, unit/Extension Host tests, независимые ревью и remediation завершены. Новый worker-enabled VSIX ещё не собран из clean remediation commit; поэтому package/install criteria остаются открытыми до release gate.
+Production-код, unit/Extension Host tests, независимые ревью, remediation и release gate завершены. Worker-enabled VSIX воспроизводимо собран, exact-проверен и установлен в изолированные VS Code `1.105.1` и Stable `1.138.0`.
 
 ## Acceptance Criteria
 
 | AC | Реализация и автоматическое доказательство | Остаточный gate | Статус |
 |---|---|---|---|
-| AC-1. Установка | Manifest, offline runtime и isolated installed-test runner реализованы. | Clean package, exact verify и установленный smoke нового VSIX. | Ожидает release gate |
+| AC-1. Установка | Clean package, exact verify и installed Extension Host smoke прошли на `1.105.1`; isolated Stable install/list также прошёл. | Нет. | Пройдено |
 | AC-2. Папка с активностью | Metadata adapter, projection и provider реализованы; 31 live root session успешно читается. | Installed view smoke. | Реализовано |
 | AC-3. Папка без активности | Folder создаётся только из непустой группы валидных sessions; unit tests проходят. | Installed view smoke с контрольной папкой. | Реализовано |
 | AC-4. Titles и детали | Tree contract проверяет path, три actions и passive conversation в точном порядке. | Визуальный smoke длинного/non-ASCII title. | Реализовано |
@@ -17,7 +17,7 @@ Production-код, unit/Extension Host tests, независимые ревью 
 | AC-7. Open Here | Используется `vscode.openFolder(uri, { forceReuseWindow: true })`; option contract проверен. | Изолированный реальный переход окна. | Реализовано |
 | AC-8. Open in New Window | Используется `vscode.openFolder(uri, { forceNewWindow: true })`; option contract проверен. | Изолированное реальное новое окно. | Реализовано |
 | AC-9. Missing folder | Folder сохраняется, warning icon/tooltip видимы, actions не получают command. | Визуальный installed smoke. | Реализовано |
-| AC-10. Read-only | `readOnly`, `query_only`, отсутствие write SQL, WAL visibility, DB/WAL fingerprints, busy/error и worker isolation проверены. | Повтор packaged-runtime test нового VSIX. | Реализовано |
+| AC-10. Read-only | `readOnly`, `query_only`, отсутствие write SQL, WAL visibility, DB/WAL fingerprints, busy/error и worker isolation проверены в source и packaged runtime. | Нет. | Пройдено |
 | AC-11. Нет registry | Storage API/Hub DB/add-remove-hide commands отсутствуют; exact manifest ограничен четырьмя командами. | Package inspection нового VSIX. | Реализовано |
 | AC-12. Explorer | Повторная local-directory проверка и `vscode.env.openExternal(fileUri)` реализованы. | Реальный Explorer smoke. | Реализовано |
 | AC-13. Фильтрация | SQL исключает child/archive; projection исключает UNC/remote/`.code-workspace`/invalid. `realpath` исключает resolved UNC. | Нет. | Пройдено автоматически |
@@ -30,15 +30,15 @@ Production-код, unit/Extension Host tests, независимые ревью 
 |---|---|---|
 | Kilo source/schema задокументированы | `docs/kilo-storage-discovery.md`; live schema и CLI oracle | Пройдено |
 | SQL adapter совпадает с Kilo | SQL/CLI: 31/31 root sessions без расхождений | Пройдено |
-| Runtime packaged и работает при WAL | Dev Extension Host proof пройден; новый installed package ожидается | Открыто |
+| Runtime packaged и работает при WAL | Development и installed Extension Host proofs пройдены | Пройдено |
 | Только supported paths | Unit tests и resolved local path checks | Пройдено |
 | Группировка и ordering | Projection suite, включая reorder и 1 000 sessions | Пройдено |
 | Refresh без restart | Код и command activation проверены; installed transition smoke ожидается | Открыто |
 | Missing state | Provider contract пройден; visual smoke ожидается | Открыто |
 | Unit/integration tests | `npm test`: 27 tests + VS Code `1.105.1`, exit `0` | Пройдено |
 | Compile/lint | `npm run check-types`, `npm run lint` | Пройдено |
-| Reproducible VSIX | Новый clean двойной package ещё не выполнен | Открыто |
-| Чистая установка VSIX | Runner готов; новый worker VSIX ещё не установлен | Открыто |
+| Reproducible VSIX | Две clean сборки: одинаковый SHA-256 `13AC1501...F67743` | Пройдено |
+| Чистая установка VSIX | Изолированные `user-data`/`extensions`, minimum host и Stable | Пройдено |
 | Ручной smoke трёх действий | Не выполнен на новом пакете | Открыто |
 | Разные Kilo states | Fixtures/live probe покрывают rows; visual transitions ожидаются | Частично |
 | CLI не нужен runtime | Production imports/VSIX не содержат CLI | Пройдено |
@@ -59,6 +59,6 @@ Production-код, unit/Extension Host tests, независимые ревью 
 | Watcher/auto refresh | File watcher/timer refresh отсутствуют |
 | API/MCP/telemetry/cloud | Contributions, imports и runtime dependencies отсутствуют |
 
-## Release Blocker
+## Остаточный ручной smoke
 
-Перед завершением документа требуется clean commit, secure-TLS `npm ci`, повторный `npm test`, две одинаковые package-сборки, exact ZIP verification, installed worker runtime smoke и запись финального SHA-256 в `handoff.md`.
+Release blocker отсутствует. Остаётся эксплуатационный визуальный клик-тест `Open Here`, `Open in New Window`, `Open in File Explorer` в disposable GUI. Installed automation намеренно не заменяет workspace и не создаёт внешние окна; command wiring, internal references, повторная local-directory проверка и exact API options проверены кодом/tests.

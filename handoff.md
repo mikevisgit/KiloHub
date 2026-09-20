@@ -29,9 +29,9 @@
 - [ ] Выбран и доказан SQLite runtime внутри упакованного расширения: `node:sqlite` и production bundle доказаны в Extension Host `1.105.1`; установленный VSIX proof ещё не выполнен.
 - [x] Реализованы metadata adapter и domain projection.
 - [x] Реализованы Activity Bar view и команды.
-- [ ] Завершены автоматические тесты и независимое ревью: три review и code remediation завершены, release-blocker ожидает новый packaged smoke.
-- [ ] VSIX собран, проверен, установлен и прошёл smoke test.
-- [ ] Здесь опубликованы точный путь и checksum итогового артефакта.
+- [x] Завершены автоматические тесты и независимое ревью; code remediation и повторные проверки выполнены.
+- [x] VSIX собран, exact-проверен, установлен и прошёл development/installed Extension Host smoke.
+- [x] Здесь опубликованы точный путь и checksum итогового артефакта.
 
 ## Выполненные проверки
 
@@ -64,6 +64,20 @@
 - Manifest использует положительный allow-list `files`; `.vscodeignore` не создаётся. Packaging автоматически фиксирует ZIP timestamp по последнему Git commit и проверяет запрещённые entries.
 - Build environment закреплён как Node `22.20.0` и npm `11.6.2`; локальная проверка выполняется на совместимом Node `24.13.0` с lockfile v3.
 
+## Итоговый артефакт
+
+- Source commit: `e777265 fix: address Step 1 review findings`.
+- Путь: `D:\VSCode\KiloHub\dist\kilo-hub-0.1.0-win32-x64.vsix`.
+- Размер: `12857` bytes.
+- SHA-256: `13AC15017C69D333E0B370770961473D1DC5FAEFD6459B7FD88BF15510F67743`.
+- Target: `win32-x64`.
+- `engines.vscode`: `^1.105.1`.
+- Exact package entries: 8, включая `extension/build/extension.js` и `extension/build/kiloDataWorker.js`; source/tests/fixtures/node_modules/DB отсутствуют.
+- Две последовательные clean сборки дали одинаковый SHA-256.
+- Изолированная установка подтверждена на VS Code `1.105.1` и Stable `1.138.0`; `local.kilo-hub@0.1.0` присутствует в отдельном extensions directory.
+
+Release gate выполнен командами: `npm ci`, `npm audit --audit-level=high`, `npm test`, два раза `npm run package`, `npm run test:installed`, а также isolated `code --install-extension ... --force` и `code --list-extensions --show-versions`. Для npm-команд принудительно задан `NODE_TLS_REJECT_UNAUTHORIZED=1`; полный протокол находится в `docs/verification.md`.
+
 ## Активные риски
 
 - Реализация SQLite должна работать в Windows Extension Host VS Code и сохранять работоспособность после упаковки в VSIX.
@@ -77,4 +91,4 @@
 
 ## Следующее действие
 
-Завершить discovery gates D1-D4 в `specs/step1-implementation-plan.md`, записать доказательства в `docs/`, затем реализовать adapter на обезличенных fixtures.
+Артефакт готов к локальной установке. Единственный эксплуатационный residual gate — визуальный клик-тест трёх переходов в disposable GUI window; command wiring и exact VS Code API options проверены автоматически, но автоматический installed test намеренно не заменяет workspace и не открывает Explorer.

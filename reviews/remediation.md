@@ -2,7 +2,7 @@
 
 ## Статус
 
-Три независимых ревью выполнены и повторно проверили изменения. Blocking/high code findings устранены. Единственный открытый release blocker — фактическая clean сборка, двойная проверка воспроизводимости и installed-VSIX smoke нового пакета с worker.
+Три независимых ревью выполнены и повторно проверили изменения. Blocking/high findings устранены. Clean сборка, двойная проверка воспроизводимости и installed-VSIX smoke нового пакета с worker прошли.
 
 ## Требования
 
@@ -31,17 +31,20 @@
 | MEDIUM-2: нет clean provenance | Исправлено в script | Packaging отклоняет dirty tree, кроме ожидаемого target artifact. Фактический clean run ожидается. |
 | MEDIUM-3: Node/npm не закреплены | Исправлено | `.nvmrc=22.20.0`, `packageManager=npm@11.6.2`, engine range ограничен Node 22.20–24.x. |
 | MEDIUM-4: insecure TLS environment | Исправлено для release команд | Lockfile/audit повторены с `NODE_TLS_REJECT_UNAUTHORIZED=1`, 0 vulnerabilities. Clean `npm ci` ожидается. |
-| BLOCKER-1: package/repro/install gate | Открыт до release gate | Runner сначала требует exact VSIX verification, использует отдельный installed extension и теперь получает reject при failed refresh. |
+| BLOCKER-1: package/repro/install gate | Закрыт | Две clean сборки совпали по SHA-256; exact verifier и strengthened installed runner прошли на новом worker VSIX. |
 
 ## Дополнительный дефект, найденный после ревью
 
 Live adapter probe обнаружил, что реальная Kilo 7.7.5 объявляет `id TEXT PRIMARY KEY`, но `PRAGMA table_info` сообщает `notnull=0`, `pk=1`. Fixture ошибочно использовал явный `NOT NULL`, поэтому старый guard отвергал рабочую базу. Guard исправлен: для `id` требуется primary-key flag, для остальных обязательных fields — точная nullable semantics. Fixture приведён к реальной schema, live worker probe возвращает 31 root session без чтения message bodies.
 
-## Остаточные действия
+## Финальное release evidence
 
-1. Зафиксировать remediation commit.
-2. Выполнить secure-TLS `npm ci` из чистого дерева.
-3. Повторить полный automated gate.
-4. Дважды собрать одинаковый VSIX и сравнить SHA-256.
-5. Установить и проверить именно новый worker-enabled VSIX.
-6. Записать результаты в `docs/verification.md`, `handoff.md` и этот отчёт.
+- Source commit: `e777265`.
+- Secure-TLS `npm ci` и audit: успешно, `0 vulnerabilities`.
+- `npm test`: 27/27 unit/subtests, lint/typecheck и Extension Host `1.105.1`, exit `0`.
+- Два `npm run package`: одинаковый SHA-256 `13AC15017C69D333E0B370770961473D1DC5FAEFD6459B7FD88BF15510F67743`.
+- Exact ZIP verifier: 8 ожидаемых entries, два свежих bundles, правильный identity/target/contributions.
+- `npm run test:installed`: установленный `local.kilo-hub@0.1.0` активирован через отдельный harness; packaged worker успешно выполнил refresh.
+- VS Code Stable `1.138.0`: isolated install/list успешно.
+
+Остаточный ручной smoke: визуально нажать три action rows в disposable GUI. Автоматические tests подтверждают internal command references, повторную проверку папки и exact API options; installed runner намеренно не заменяет test workspace и не открывает Explorer.

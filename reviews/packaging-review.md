@@ -207,3 +207,87 @@ Runner корректно создаёт отдельные `user-data`/`extensi
 ### Итог повторной проверки
 
 Dynamic artifact naming, clean-tree provenance check, Node/npm pinning, secure audit evidence и exact verification обоих bundles реализованы. Installed-test runner изолирует профиль и действительно загружает установленное расширение, но пока не доказывает успешный refresh новой worker-реализации. Статус выпуска остаётся заблокирован только фактическим clean package/repro/install/smoke gate; новый финальный VSIX в рамках этого ревью не создавался.
+
+## Финальная проверка release artifact
+
+Дата финальной проверки: 2026-09-20.
+
+Проверка выполнена read-only по существующему артефакту и release evidence. Артефакт повторно не собирался и не переупаковывался.
+
+### BLOCKER-1 закрыт
+
+**Статус:** `ЗАКРЫТ`.
+
+Фактический clean package/repro/install gate выполнен. Несоответствий заявленным release-параметрам не найдено.
+
+Подтверждённые параметры:
+
+- source commit: `e77726559169687c66693c3865baaa95f936d7b3` (`e777265 fix: address Step 1 review findings`);
+- production/build inputs соответствуют source commit; после выпуска отдельно изменяются только release evidence и сам untracked VSIX;
+- артефакт: `D:\VSCode\KiloHub\dist\kilo-hub-0.1.0-win32-x64.vsix`;
+- размер: `12857` bytes;
+- SHA-256: `13AC15017C69D333E0B370770961473D1DC5FAEFD6459B7FD88BF15510F67743`;
+- две последовательные clean package-сборки имеют одинаковый SHA-256 `13AC15017C69D333E0B370770961473D1DC5FAEFD6459B7FD88BF15510F67743`;
+- ZIP timestamp соответствует времени source commit, используемому через `SOURCE_DATE_EPOCH`;
+- deployment manifest содержит `Version="0.1.0"`, `Publisher="local"`, `TargetPlatform="win32-x64"`, engine `^1.105.1` и `ExtensionKind=ui`;
+- packaged manifest содержит ожидаемые identity, engine, activation events, один container/view и четыре нормативные команды;
+- runtime npm dependencies и `node_modules` в пакете отсутствуют.
+
+### Exact package verification
+
+Повторный read-only запуск `npm run verify:vsix` завершился успешно и подтвердил ровно восемь entries:
+
+```text
+[Content_Types].xml
+extension.vsixmanifest
+extension/LICENSE.txt
+extension/build/extension.js
+extension/build/kiloDataWorker.js
+extension/docs/release-notes.md
+extension/package.json
+extension/resources/hub.svg
+```
+
+Hashes обоих production bundles совпадают между текущим verified build output, VSIX и двумя изолированными installed directories:
+
+- `extension.js`: `16F4DD70983673CEEEA47EBDE3582E27AC879466075A8CD9B19EB47FCBDA72CA`;
+- `kiloDataWorker.js`: `19E53E44A3962A6F3BE7C223838277EA443502A88E625C2C91552849002F4356`.
+
+Это закрывает прежний риск stale VSIX без worker и подтверждает, что exact verifier проверяет оба фактически исполняемых bundles.
+
+### Dependency и automated evidence
+
+Release evidence в `docs/verification.md` и `reviews/remediation.md` фиксирует:
+
+- secure-TLS `npm ci` на закреплённых Node/npm;
+- `npm audit --audit-level=high`: `0 vulnerabilities`;
+- `npm test`: typecheck, ESLint, 27/27 unit/subtests и Extension Host VS Code `1.105.1`, exit code `0`;
+- два последовательных `npm run package` с одинаковым SHA-256;
+- successful exact verifier после каждой production package-сборки.
+
+### Installed package evidence
+
+`npm run test:installed` прошёл на VS Code `1.105.1` в отдельных `user-data` и `extensions` directories:
+
+- CLI log фиксирует установку именно `D:\VSCode\KiloHub\dist\kilo-hub-0.1.0-win32-x64.vsix`;
+- `extensions.json` фиксирует `local.kilo-hub@0.1.0` с source `vsix`;
+- установленный каталог содержит оба production bundles с hashes, совпадающими с VSIX;
+- Extension Host log фиксирует activation `local.kilo-hub` по `onCommand:kiloHub.refresh` и завершение host с code `0`;
+- strengthened runner предварительно запускает exact verifier, а refresh теперь propagates failure, поэтому прежний false-positive сценарий устранён;
+- Output `Kilo Hub` после успешного fixture refresh не содержит runtime errors.
+
+Отдельная Current Stable проверка также подтверждена:
+
+- версия VS Code Stable: `1.138.0`;
+- отдельные `build/smoke/user-data` и `build/smoke/extensions`;
+- CLI log фиксирует успешную установку финального VSIX;
+- последующий isolated `--list-extensions --show-versions` и `extensions.json` подтверждают `local.kilo-hub@0.1.0`;
+- installed bundle hashes совпадают с финальным VSIX.
+
+### Остаточный scope
+
+Визуальное нажатие `Open Here`, `Open in New Window` и `Open in File Explorer` в disposable GUI остаётся ручным эксплуатационным smoke. Оно не переоткрывает `BLOCKER-1`: package integrity, reproducibility, installation, activation и packaged worker refresh доказаны; command references, повторная path-проверка и exact VS Code API options покрыты автоматическими проверками.
+
+### Финальный вывод
+
+`BLOCKER-1` закрыт. Финальный VSIX соответствует source commit `e777265`, воспроизводим по сохранённому release evidence, проходит exact проверку восьми entries, устанавливается и активируется из изолированного каталога на минимальном VS Code `1.105.1` и Current Stable `1.138.0`. Открытых blocking/high packaging findings не осталось.

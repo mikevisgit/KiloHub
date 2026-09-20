@@ -124,3 +124,58 @@ Unit test подтвердил concurrency bound `<=16` на 1 000 sessions/100 
 - `npm run test:integration` — production bundles `build/extension.js` и `build/kiloDataWorker.js` успешно собраны; Extension Host tests не запущены, потому что VS Code `1.105.1` сообщил: `Running extension tests from the command line is currently only supported if no other instance of Code is running.`
 
 Итог повторной проверки: открытых High findings в просмотренном source нет. Остаются два Medium (`MEDIUM-01`, `MEDIUM-02`) и один Low (`LOW-01`); `LOW-02` закрыт. Packaging/installed-host доказательство worker остаётся обязательным verification gate.
+
+## Финальная проверка worker-enabled VSIX 20.09.2026
+
+Проверен финальный commit `e77726559169687c66693c3865baaa95f936d7b3` и созданный из него worker-enabled пакет. Source tree перед проверкой не содержал tracked-изменений; единственным untracked-файлом был итоговый VSIX в `dist/`.
+
+### Доказательства выпуска
+
+| Проверка | Фактический результат |
+|---|---|
+| Clean dependency install | С `NODE_TLS_REJECT_UNAUTHORIZED=1` команда `npm ci` установила 239 packages и проверила 240 packages без TLS downgrade. |
+| Dependency audit | `npm audit --audit-level=high` завершился успешно: `0 vulnerabilities`. |
+| Полный automated suite | `npm test` прошёл: TypeScript, ESLint, `27/27` unit tests и Extension Host VS Code `1.105.1`; host завершился с code `0`. |
+| Worker responsiveness | В финальном прогоне synchronous busy probe завершился примерно за `6 724 ms`, worker probe примерно за `6 836 ms`, а timer основного event loop сработал до ответа worker. |
+| Live source | Обезличенный вызов production-facing `readKiloSessions()` через worker вернул `liveWorkerSessions=31` на рабочей Kilo DB. Titles и message bodies не выводились. |
+| Exact package | `npm run verify:vsix` подтвердил ровно восемь разрешённых entries, включая `extension/build/extension.js` и `extension/build/kiloDataWorker.js`, корректные manifest/target и совпадение обоих packaged bundles со свежим build output. |
+| Installed package | `npm run test:installed` повторно выполнил exact verification, установил VSIX в отдельные `--user-data-dir`/`--extensions-dir`, подтвердил `local.kilo-hub@0.1.0` и успешно завершил Extension Host refresh с code `0`. |
+
+Идентичность проверенного артефакта:
+
+- путь: `D:\VSCode\KiloHub\dist\kilo-hub-0.1.0-win32-x64.vsix`;
+- размер: `12 857` bytes;
+- SHA-256: `13AC15017C69D333E0B370770961473D1DC5FAEFD6459B7FD88BF15510F67743`;
+- exact entries: `[Content_Types].xml`, `extension.vsixmanifest`, `extension/LICENSE.txt`, `extension/build/extension.js`, `extension/build/kiloDataWorker.js`, `extension/docs/release-notes.md`, `extension/package.json`, `extension/resources/hub.svg`.
+
+### HIGH-01: закрыт
+
+Disposition `HIGH-01` окончательно изменён на **закрыт с Extension Host и installed-VSIX proof**.
+
+Финальная цепочка выполнения подтверждена на трёх уровнях:
+
+- Unit runtime вызывает `readKiloSessions()` и сохраняет responsive main event loop при реальном `SQLITE_BUSY`: `tests/unit/kiloDataSource.test.ts:284-306`.
+- Development Extension Host загружает свежие `build/extension.js` и `build/kiloDataWorker.js`, выполняет `kiloHub.refresh` и завершает тест с code `0`: `tests/integration/index.ts:146-224`.
+- Installed harness сначала требует успешный exact verifier, затем устанавливает только проверенный VSIX, проверяет ID/version установленного продукта и запускает integration test с development path, указывающим только на отдельный harness extension: `scripts/run-installed-extension-tests.mjs:8-71`. Следовательно `local.kilo-hub` и его worker загружаются из изолированного installed extensions directory, а не из workspace extension build.
+
+Прежний false positive installed test устранён error propagation: `performRefresh()` после user-facing диагностики повторно бросает исходную ошибку, а lazy visibility path отдельно поглощает её только для fire-and-forget вызова: `src/extension.ts:52-78`, `src/extension.ts:97-103`. Поэтому `await vscode.commands.executeCommand('kiloHub.refresh')` в `tests/integration/index.ts:198-215` не мог завершиться успешно при отсутствующем worker, schema failure или worker error. Успешный installed прогон является положительным доказательством packaged worker refresh, а не только регистрации команды.
+
+### Schema guard и ошибки worker
+
+Schema guard приведён к фактической семантике SQLite/Kilo 7.7.5. Для `id TEXT PRIMARY KEY` SQLite возвращает `notnull=0`, `pk=1`; production теперь проверяет primary-key flag для `id`, точный `NOT NULL` для обязательных metadata fields и nullable/non-PK состояние остальных: `src/kiloDataSource.ts:26-37`, `src/kiloDataSource.ts:178-220`. Негативный test без primary key добавлен в `tests/unit/kiloDataSource.test.ts:179-214`. Live worker успешно принял рабочую schema и вернул 31 session, поэтому прежний ложный schema reject устранён без ослабления проверки уникальной идентичности `session.id`.
+
+Worker по-прежнему сериализует только message/stack ошибки, основной поток восстанавливает `KiloDataSourceError`, а refresh теперь пробрасывает failure вызывающей команде: `src/kiloDataWorker.ts:14-26`, `src/kiloDataSource.ts:326-349`, `src/extension.ts:71-78`. Это даёт installed harness наблюдаемый отрицательный результат для missing worker, несовместимой schema, timeout и SQLite error.
+
+### Реальные остаточные риски
+
+#### MEDIUM-01: первичная Windows path resolution может обратиться к network provider
+
+Resolved-local guard, таймауты и concurrency bound защищают refresh от бесконечного ожидания и отклоняют UNC target после `realpath`, но не предотвращают само первоначальное разрешение потенциального mapped/reparse path. `Promise.race()` также не отменяет уже начатые `stat/realpath`, а trusted `KILO_DB` на mapped drive не проходит этот availability guard. Риск ограничен локальной Windows-конфигурацией и доверенными Kilo/environment paths, но возможность краткого SMB/network обращения остаётся. Финальный disposition: **Medium, принят как известное ограничение**.
+
+#### MEDIUM-02: metadata query полностью материализуется внутри worker
+
+Worker timeout `10 000 ms`, old-generation limit `64 MB`, ограничения длины fields/warnings и максимум 16 availability checks защищают основной event loop и ограничивают типовой ущерб. Однако `prepare(...).all()` всё ещё создаёт полный массив до row validation, а затем весь результат клонируется одним `postMessage`; V8 old-generation limit не является полным RSS/native-memory limit процесса. На подтверждённой рабочей базе с 31 session и тесте 1 000 sessions проблема не проявляется, но специально созданная schema-compatible база экстремального размера остаётся memory-pressure vector. Финальный disposition: **Medium, принят для Step 1 при доверенном локальном источнике**.
+
+Открытых Low findings после финальной проверки нет. `LOW-02` закрыт sanitization/caps. Прежний `LOW-01` исключён из security residual: относительный `KILO_DB` намеренно повторяет официальный `path.resolve`, override документирован как доверенная пользовательская настройка и уже допускает абсолютный путь, поэтому `..` не пересекает отдельную security boundary: `docs/kilo-storage-discovery.md:28-40`.
+
+Финальный security verdict: **High/Blocking findings отсутствуют; worker-enabled VSIX соответствует read-only границе и прошёл exact package плюс installed Extension Host verification. Остаются только два явно документированных Medium риска выше.**
