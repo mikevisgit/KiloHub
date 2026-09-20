@@ -39,3 +39,6 @@
 .panel.monograms .mono{font-size:calc(var(--hub-base) * 1.1538461538);font-weight:700}
 /* Узкая область меняет доступную ширину и переносы, а не размер шрифта. */
 .panel .identity{min-width:0;flex:1}
+
+/* Без команд история начинается сразу: не резервируем пустое место под действия. */
+.panel .detail > .history:first-child{margin-top:0;padding-top:0;border-top:0}

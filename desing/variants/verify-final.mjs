@@ -8,7 +8,14 @@ assert.deepEqual(sortFolders([{id:'a',name:'А',activity:at(0)},{id:'c',name:'В
 let panels=0;
 for(const [file,count]of [['01-monograms.html',4],['vscode-monograms/02-inset.html',3]]){
  const html=fs.readFileSync(path.join(root,file),'utf8');assert.equal((html.match(/class="panel /g)||[]).length,count);panels+=count;
- assert.equal((html.match(/class="history"/g)||[]).length,count*5);assert.equal((html.match(/class="dialogue"/g)||[]).length,count*13);assert.equal((html.match(/aria-disabled="true"/g)||[]).length,count*3);
+ assert.equal((html.match(/class="history"/g)||[]).length,count*5);assert.equal((html.match(/class="dialogue"/g)||[]).length,count*13);assert.equal((html.match(/aria-disabled="true"/g)||[]).length,0);
+ for(const match of html.matchAll(/<article class="folder ([^"]*)"([\s\S]*?)<\/article>/g)){
+  const [,classes,body]=match,missing=classes.includes('missing'),current=classes.includes('current');
+  assert.equal((body.match(/<button /g)||[]).length,missing?0:current?1:3);
+  assert.equal(body.includes('class="actions"'),!missing);
+  if(current&&!missing){assert(body.includes('Показать файлы папки'));assert(!body.includes('>Открыть в'));}
+  assert(body.includes('class="history"'));assert(body.includes('class="activity"'));
+ }
  assert.equal((html.match(/aria-expanded="true"/g)||[]).length,count);assert.equal((html.match(/Вы сейчас здесь/g)||[]).length,count);
  for(const forbidden of ['<time','class="path"','class="hint"','<ul','Открыть в новом окне','Ваши папки'])assert(!html.includes(forbidden),forbidden);
  for(const m of html.matchAll(/(?:href|src)="([^"]+)"/g)){const [p,anchor]=m[1].split('#');const dest=path.resolve(path.dirname(path.join(root,file)),decodeURIComponent(p||path.basename(file)));assert(fs.existsSync(dest),dest);if(anchor)assert(fs.readFileSync(dest,'utf8').includes(`id="${anchor}"`));}
