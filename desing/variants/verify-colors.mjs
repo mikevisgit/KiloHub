@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';import fs from 'node:fs';import{createRequire}from'node:module';import vm from 'node:vm';
 const C=createRequire(import.meta.url)('./folder-colors.cjs');
+assert.deepEqual([...C.slotOrder].sort((a,b)=>a-b),Array.from({length:16},(_,i)=>i));
+for(let i=1;i<16;i++){const d=Math.abs(C.hues[C.slotOrder[i]]-C.hues[C.slotOrder[i-1]]);assert(Math.min(d,360-d)>=60,'demo neighbours use separated hue families');}
 assert.equal(C.hues.length,16);assert.equal(C.lightFills.length,16);
 for(const color of ['#d3e9d9','#f4deca','#e5ddf5','#d5e7ed'])assert(C.lightFills.includes(color));
 const css=fs.readFileSync(new URL('scale.css',import.meta.url),'utf8');assert(css.includes('var(--folder-border,transparent)'));assert(!css.includes(':not(.demo-original)'));assert.equal(new Set(C.hues).size,16);
@@ -15,7 +17,7 @@ for(const file of ['01-monograms.html','vscode-monograms/02-inset.html']){
  const html=fs.readFileSync(new URL(file,import.meta.url),'utf8');
  for(const panel of html.split('<section class="panel ').slice(1)){
   const entries=[...panel.split('</section>')[0].matchAll(/data-path="([^"]+)"[\s\S]*?data-color-group="(\d+)"/g)].map(m=>[m[1],Number(m[2])]);
-  assert.equal(entries.length,16);assert.equal(new Set(entries.map(x=>x[1])).size,16);
+  assert.equal(entries.length,16);assert.deepEqual(entries.map(x=>x[1]),Array.from({length:16},(_,i)=>i));assert.equal(new Set(entries.map(x=>x[1])).size,16);
   for(const [path,slot]of entries)assert.equal(C.group(path),slot);
   reference??=entries;assert.deepEqual(entries,reference);panels++;
  }

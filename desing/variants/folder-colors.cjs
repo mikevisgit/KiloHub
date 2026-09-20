@@ -1,5 +1,7 @@
 // Локальный общий алгоритм; не читает файловую систему и не хранит реестр цветов.
 (function(root){
+ // Фиксированное чередование семейств; порядок папок никогда не зависит от цвета.
+ const slotOrder=[1,6,12,9,15,5,2,13,8,0,10,3,14,7,11,4];
  const hues=[0,20,38,55,76,100,130,155,175,195,215,235,255,275,300,330];
  function normalize(value){
   if(typeof value!=='string'||/[\x00-\x1f<>"|?*]/.test(value))return null;
@@ -18,12 +20,13 @@
  const black=[0,0,0],white=[255,255,255];
  function readable(bg){return contrast(black,bg)>=contrast(white,bg)?black:white;}
  function palette(slot,surface,highContrast=false,edge=surface){
+  slot=slotOrder[slot];
   const light=lum(surface)>.35;
   const bg=light?lightFills[slot].slice(1).match(/../g).map(v=>parseInt(v,16)):hsl(hues[slot],24,28);
   let fg=hsl(hues[slot],28,light?25:90);if(contrast(fg,bg)<4.5)fg=readable(bg);
   return{bg,fg,border:highContrast&&contrast(bg,edge)<3?readable(edge):null};
  }
  const css=rgb=>rgb?`rgb(${rgb.join(', ')})`:'transparent';
- const api={hues,lightFills,normalize,group,lum,contrast,palette,css};
+ const api={slotOrder,hues,lightFills,normalize,group,lum,contrast,palette,css};
  if(typeof module!=='undefined')module.exports=api;else root.HubColors=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
