@@ -238,3 +238,11 @@ UX28: .folder-head — единственный fullpath-owner в обоих с�
 Воспроизведён случай pointer-events:none с owner под tooltip: прежде pointermove внутри прямоугольника не скрывал popup. Теперь общий capture-pointermove обработчик среды проверяет каждый видимый popup и скрывает его в том же событии при попадании clientX/Y (границы включены). Owner подавлен до настоящего leave/reentry, между потомками не появляется. Listener один на среду/окно для7панелей, повторная установка идемпотентна, отсоединённые панели убираются из списка наблюдения.
 
 Проверены до/после, края rect, отсутствие перехвата pointer, panel-local dismissal и повторный вход. ТЗ/UX/размеры дополнены; остальные5verify проходят. Отчёт reviews/design-tooltip-geometry-dismiss.md. Не заявляется реальный browser hit-testing/рендер; production не тронут.
+
+### Консолидация пакета Step 2: только монограммы
+
+Пользователь окончательно выбрал монограммы. Единственный вход desing/START_HERE.md ведёт к каноническому desing/ТЗ реализации дизайна VSIX.md и нормативному design-size-spec.md. Вариантов на выбор больше нет; Step2production остаётся будущей работой. Все принятые UX, включая геометрическое скрытие tooltip, сверены с каноном: reviews/design-step2-consolidation.md.
+
+В desing/old_donotuse перенесены6файлов: design-task.md, design-task-v2.md, UX правки.md, variants/README.md, variants/vscode-monograms/02-inset.html и screenshots/kilo-hub-inset-in-vscode-preview.png. Их содержимое сохранено, добавлен поясняющий README. Архив не является runnable dependency/requirements. Активны3реальных baseline-screenshot как evidence, выбранный HTML с4темами/64папками, галерея и необходимые CSS/JS/5проверок.
+
+Генератор больше не создаёт другой дизайн; inset-CSS ветки убраны, размерный каскад сведён к тем же фактическим размерам монограмм. Все5verify проходят, verify-final проверяет локальные ссылки всего активного desing исключаяархив и запрещает активные зависимости наархив. Сравнены6archivepayload с прежними отслеживаемыми версиями. Реальный browser/VSIX/темы/клавиатурная приёмка не выполнены; ограничение Webviewtooltip сохраняется, production/reqStep1/БД не менялись.

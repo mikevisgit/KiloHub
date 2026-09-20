@@ -1,135 +1,103 @@
-# Полная размерная спецификация двух эталонов
+# Размерная спецификация Step 2 — Монограммы
 
-**Нормативная часть [финального ТЗ реализации дизайна VSIX](ТЗ%20реализации%20дизайна%20VSIX.md)**. Описывает фактические текущие макеты «Тонкие рамки» и исходные «Монограммы», все семь тематических представлений. Это спецификация по каскаду исходников, не измерение браузерного рендера. Макеты данным документом не изменяются.
+Нормативное приложение к [каноническому ТЗ](ТЗ%20реализации%20дизайна%20VSIX.md). Описывает выбранный дизайн в4темах. Источники в порядке каскада: [demo-themes.css](variants/demo-themes.css), [panel.css](variants/panel.css), [refinements.css](variants/refinements.css), [scale.css](variants/scale.css); движение/позиция tooltip — [interaction.cjs](variants/interaction.cjs), [demo.js](variants/demo.js). Это анализ исходников, не измеренный браузерный рендер.
 
-Источники в порядке подключения: [demo-themes.css](variants/demo-themes.css) → [panel.css](variants/panel.css) → [refinements.css](variants/refinements.css) → [scale.css](variants/scale.css); inline-размеры tooltip/анимации задают [interaction.cjs](variants/interaction.cjs) и [demo.js](variants/demo.js). Если ранняя декларация перекрыта поздней, ниже указано итоговое значение. Старые `.path`, `.hint`, `.history ul/li/time` не создаются текущим HTML и не являются элементами дизайна.
+## База и токены
 
-## Обозначения и общие правила
+Все px — CSSpx, не пиксели screenshot. `B=var(--vscode-font-size,13px)`, family=`var(--vscode-font-family,'Segoe UI',Arial,sans-serif)`, W=`var(--vscode-font-weight,400)`. Не подменять editor.fontSize. Box-sizing:border-box; h1/h2/h3/p margin0, кроме указанных ниже случаев. Letter-spacing продуктового текста/монограмм normal.
 
-- Все `px` ниже — CSSpx, не пиксели изображений и не физические пиксели экрана.
-- `B = --hub-base = var(--vscode-font-size,13px)`. Семейство: `var(--vscode-font-family,'Segoe UI',Arial,sans-serif)`. `W = var(--vscode-font-weight,400)` — обычное начертание. Не использовать `editor.fontSize` как UI-базу.
-- `S = --hub-secondary = (12/13)B`. В CSS коэффициенты записаны десятичными приближениями, например `.9230769231`; дроби в таблицах эквивалентны с погрешностью менее0,000001px при B13–20.
-- `X = --hub-row-x`: рамки `(10/13)B`, монограммы `(12/13)B`; `Y = --hub-row-y`: `(8/13)B` / `(11/13)B`; `G = --hub-gap`: `(8/13)B` / `(10/13)B`.
-- `N = --hub-name-size`: `(15/13)B` / `(16/13)B`; `M = --hub-mono-size`: `(32/13)B` / `(36/13)B`.
-- Везде `box-sizing:border-box`. Числовой line-height умножается на font-size самого элемента. Размер glyph не равен line-height. У h1/h2/h3/p глобально margin0; исключения ниже.
-- Семейство наследуется от панели, обычные кнопки используют `font:inherit`, затем получают размеры из scale.css. Letter-spacing имён/меток/монограмм и заголовка списка — `normal`, отрицательные ранние значения перекрыты.
+| Токен | Формула | B13 |
+| --- | --- | --- |
+| secondary S | 12/13B | 12px |
+| name N | 16/13B | 16px |
+| mono M | 36/13B | 36px |
+| row-x X | 12/13B | 12px |
+| row-y Y | 11/13B | 11px |
+| gap G | 10/13B | 10px |
 
-## Типографика: все видимые тексты панели
+CSS использует десятичные эквиваленты дробей с погрешностью<0,000001px при B13–20. Фиксированные border/radius/outline/shadow px не умножаются вручную на B; zoom масштабирует их штатно.
 
-| Элемент | Font-size: рамки / монограммы | При B13, px | Font-weight | Line-height; при B13, px |
+## Полная типографика панели
+
+| Элемент | Размер | B13 | Weight | Line-height; B13 |
 | --- | --- | --- | --- | --- |
-| База панели и текст header | B / B | 13 / 13 | W | 1,4; 18,2 |
-| `Kilo Hub` в header strong | B / B | 13 / 13 | 600 | 1,4; 18,2 |
-| «Мои папки с Kilo» | 14/13B / 15/13B | 14 / 15 | 600 | 1,3; 18,2 / 19,5 |
-| Имя папки `.name` | N | 15 / 16 | 600 | 1,3; 19,5 / 20,8 |
-| «Вы сейчас здесь» | S | 12 / 12 | W / 600 | 1,4; 16,8 |
-| Дата активности | S | 12 / 12 | W | 1,4; 16,8 |
-| «Папка не найдена» | S | 12 / 12 | W | 1,4; 16,8 |
-| Доступные действия | B | 13 / 13 | W | 1,4; 18,2 |
-| «Последние диалоги» | B | 13 / 13 | 600 | 1,4; 18,2 |
-| Название каждого диалога | B | 13 / 13 | W | 1,55; 20,15 |
-| Tooltip, включая полный путь | B | 13 / 13 | W | 1,45; 18,85 |
-| Статус демонстрационной команды | B | 13 / 13 | W | 1,4; 18,2 |
-| Буквы монограммы | B / 15/13B | 13 / 15 | 600 / 700 | 1; 13 / 15 |
-| Chevron `⌄` | B | 13 / 13 | W | 1; 13 |
-| Info `ⓘ` | B | 13 / 13 | W | 1; 13 |
-| Refresh `↻` | 16/13B | 16 / 16 | W | 1; 16 |
+| Панель/header | B | 13px | W | 1,4;18,2px |
+| Kilo Hub strong | B | 13px | 600 | 1,4;18,2px |
+| Мои папки с Kilo | 15/13B | 15px | 600 | 1,3;19,5px |
+| Имя папки | N | 16px | 600 | 1,3;20,8px |
+| Вы сейчас здесь | S | 12px | 600 | 1,4;16,8px |
+| Активность / missing | S | 12px | W | 1,4;16,8px |
+| Действия | B | 13px | W | 1,4;18,2px |
+| Последние диалоги | B | 13px | 600 | 1,4;18,2px |
+| Название диалога | B | 13px | W | 1,55;20,15px |
+| Tooltip | B | 13px | W | 1,45;18,85px |
+| Demo-status | B | 13px | W | 1,4;18,2px |
+| Буквы монограммы | 15/13B | 15px | 700 | 1;15px |
+| Chevron / info | B | 13px | W | 1;13px |
+| Refresh | 16/13B | 16px | W | 1;16px |
 
-Статус демонстрации отсутствует до нажатия команды. Он не является дополнительным постоянным пояснением будущего расширения. Полный путь не имеет своей строки в деталях: применяется размер tooltip.
+Кнопки наследуют семейство/weight через font:inherit. Путь показывается в tooltip и не имеет собственной строки деталей. Demo-status отсутствует до демонстрационной команды и не добавляется в продукт как постоянное пояснение.
 
-## Геометрия основных блоков
+## Геометрия блоков
 
-В парных примерах первое значение — рамки, второе — монограммы. Padding указан верх/право/низ/лево, сокращение V/H — вертикаль/горизонталь.
-
-| Блок / свойство | Итоговая формула или правило | Пример B13, px |
+| Элемент | Правило | B13 |
 | --- | --- | --- |
-| Панель | width auto по выделенной области; height790px только у локального стенда; min-height0 | Стенд790; для Webview доступная высота секции, не фиксировать ширину |
-| Панель padding | 0 0 G 0 | Низ8 / 10 |
-| Header | padding `(6/13)B X`; flex gap G; justify-content space-between, align-items center | V6; H10 / 12; gap8 / 10 |
-| Intro | padding G X; flex gap `(6/13)B`; min-width0 | V8 / 10; H10 / 12; gap6 |
-| Список `.folders` | grid; padding `(3/13)B X G`; gap G | Верх3; H10 / 12; низ8 / 10; gap8 / 10 |
-| Карточка `.folder` | margin0, min-width0; ширина grid-ячейки, высота content-dependent | Нет фиксированной ширины/высоты |
-| Нажимаемая плашка `.folder-head` | flex; padding Y X; gap G; align-items center | V8 / 11; H10 / 12; gap8 / 10 |
-| Текстовая область `.identity` | flex1, min-width0 | Занимает остаток после знака, chevron и двух gaps |
-| Current-пометка | margin-bottom `(2/13)B` | 2 |
-| Дата / missing-пометка | каждая margin-top `(3/13)B` | 3 |
-| Обёртка деталей | закрыта: height0, overflow hidden, inert; открыта: height auto; при переходе inline height по анимации | Не назначать фиксированную высоту раскрытию |
-| `.detail` | padding `(4/13)B X G`, min-width0; правило с `!important` | Верх4; H10 / 12; низ8 / 10 |
-| `.actions` | grid, gap `(4/13)B` | 4 между соседними кнопками |
-| Кнопка действия | min-width0; min-height `(28/13)B`; padding `(4/13)B (8/13)B`; gap8px внутри flex | min28; V4/H8; внутренний gap8 фиксированный (в текущем HTML нет отдельной иконки) |
-| История `.history` | margin-top G; padding-top G; border-top1px | Внешний gap8 / 10, внутренний8 / 10 |
-| Заголовок истории | width fit-content; margin-bottom `(4/13)B` | 4 до первого названия |
-| Строки диалогов | margin0, дополнительных row-gap/padding нет | Шаг одной строки20,15 при B13 |
-| Непустой demo-status | padding G X | V8 / 10; H10 / 12 |
-| Пустой demo-status | margin0, padding не задан; пустой p | Нет добавленного текстового блока |
+| Панель | width auto, min-height0, padding-bottom G; height790px только стенд | Низ10px |
+| Header | flex center/space-between, padding6/13B X, gap G | V6/H12/gap10px |
+| Intro | flex center, padding G X, gap6/13B, min-width0 | V10/H12/gap6px |
+| Список | grid, padding3/13B X G, gap G | Верх3/H12/низ10/gap10px |
+| Карточка | margin0, min-width0, ширина по grid, высота по содержимому | Не фиксировать |
+| Folder-head | flex center, padding Y X, gap G | V11/H12/gap10px |
+| Identity | flex1, min-width0 | Остаток ширины |
+| Current-label | margin-bottom2/13B | 2px |
+| Дата / missing | каждая margin-top3/13B | 3px |
+| Монограмма | height M, flex0 0 M, grid center | 36×36px |
+| Chevron | flex0 0 1em, text-align center | Колонка13px |
+| Info/refresh | min-width/min-height24/13B, padding2/13B, flex-shrink0 | min24×24px, padding2px |
+| Detail-wrap | closed height0/overflowhidden/inert; open auto; при движении inline height | По содержимому |
+| Detail | padding4/13B X G!important, min-width0 | Верх4/H12/низ10px |
+| Actions | grid, gap4/13B | 4px |
+| Действие | min-height28/13B, min-width0, padding4/13B 8/13B; flex gap8px | min28px,V4/H8px |
+| История | margin-top G,padding-top G,border-top1px | 10/10/1px |
+| History h3 | widthfit-content, margin-bottom4/13B | 4px |
+| Диалоги | margin0, без row-gap/padding | Шаг20,15px |
+| Непустой demo-status | padding G X | V10/H12px |
+| Tooltip | padding8/13B X | V8/H12px |
 
-Видимость: доступная текущая папка содержит только второстепенную кнопку Проводника, доступная нетекущая — три команды. У missing контейнер `.actions` отсутствует (даже если current); `.detail > .history:first-child` имеет margin-top0, padding-top0, border-top0. Высота деталей уменьшается по содержимому, место под удалённые кнопки не резервируется. Стили disabled остаются защитными, но в текущем HTML таких кнопок нет.
+У текущей доступной папки одна второстепенная команда Проводника; у прочих доступных три; у missing контейнера действий нет. `.detail > .history:first-child` имеет margin-top0/padding-top0/border-top0. Не резервировать пространство под отсутствующие кнопки. Фактическая однострочная кнопка B13: max(28,18,2+8+2)=28,2px; перенос увеличивает высоту. Внутренний flex gap8px фиксирован, отдельной иконки действия сейчас нет.
 
-Кнопка действия растягивается grid по ширине деталей; текст выровнен влево. Фактическая однострочная высота при B13 — `max(28,18,2+4+4+1+1)=28,2px`, а не ровно28px. При переносе увеличивается по содержимому. Панель и карточки не должны получать фиксированную ширину из этого примера.
+Collapsed height: `2Y+max(M,identityHeight,B)+2*border`. Однострочные имя+дата дают identity=1,3N+3/13B+1,4S; при B13/border1 карточка64,6px. Current добавляет1,4S+2/13B →83,4px. Missing добавляет строку/отступ и нижнюю рамку header. HC border2 добавляет2px к этим примерам. Высота раскрытия/content/переносов не фиксируется. Знак декоративный; область нажатия — вся плашка. Минимум кнопок24/28px не означает44px touch-target.
 
-## Знаки и области нажатия
+## Рамки и скругления
 
-| Элемент | Геометрия | B13, px | Область взаимодействия |
-| --- | --- | --- | --- |
-| Монограмма | height M; flex `0 0 M`; border входит в M; grid place-items center | 32×32 / 36×36 | Сам знак декоративный, aria-hidden; активна вся плашка |
-| Chevron | flex `0 0 1em` при font-size B; line-height1; text-align center | Колонка13, строка13; glyph зависит от шрифта | Часть общей плашки, отдельной кнопки нет |
-| Refresh/info | flex-shrink0; min-width/min-height `(24/13)B`; padding `(2/13)B`; border1px | Минимум24×24, padding2 со всех сторон | Вся кнопка; это минимальная область CSS, не обещание touch-target44px |
-| Действие | min-height28/13B, width по grid; padding выше | Минимум28px, фактически≥28,2px для одной строки | Вся кнопка; у missing кнопок нет |
-| Название диалога / дата | Content-sized строки; дата без tooltip/tabindex | По строке и доступной ширине | Нет команды открытия/отдельного минимального hit-target |
-
-Высота collapsed-плашки не фиксирована: `2Y + max(M, высота identity, B)`; к карточке добавляются её внешние border. Для обычной одной строки имени + одной даты identity = `1,3N + (3/13)B + 1,4S`. При B13 и border1px: карточка≈57,3px / 64,6px. Current добавляет строку `1,4S` и margin2/13B; получаются≈76,1px / 83,4px. Это арифметические примеры без переноса, не CSS height. Missing дополнительно включает свою строку с margin и border-bottom плашки; длинное имя, zoom и переносы меняют высоту. Раскрытая карточка равна высоте плашки + фактической высоте деталей + внешним border; её точную высоту заранее не фиксировать.
-
-## Рамки, скругления, контуры
-
-| Элемент | Рамки | Radius / дополнительные эффекты |
+| Элемент | Рамка / эффект | Radius |
 | --- | --- | --- |
-| Панель | 1px solid `--hub-border` | Radius не задан |
-| Header | Только нижняя1px solid `--hub-border` | Нет тени |
-| Карточка рамок | 1px solid `--hub-border` во всех3темах | Radius4px |
-| Карточка монограмм | 1px solid `--hub-border`; в `.demo-contrast`2px | Radius15px во всех4темах |
-| Плашка | Отдельной общей рамки нет; missing border-bottom1px dashed | Radius inherit от карточки |
-| Монограмма | 1px solid `--folder-border` с fallback `--hub-outline`; missing dashed | Radius4px / 14px |
-| Действие | 1px solid `--hub-outline`; missing1px dashed `--hub-border` | Radius2px / 7px |
-| История | border-top1px solid `--hub-border` | Без собственной карточки |
-| Info/refresh | 1px solid transparent | Radius не задан авторским CSS: возможен UA-default, точное число не нормативно |
-| Current-плашка | Outline1px solid `--vscode-contrastActiveBorder`, offset−1px; inset shadow2px 0 `--vscode-focusBorder` | В оригинальной палитре монограмм shadow:none, фон прозрачный; border карточки цвет#8ab599 |
-| Focus-visible | outline2px solid `--hub-focus`, offset2px | Не занимает место в потоке |
-| Tooltip | 1px solid `--hub-focus` | Radius не задан; shadow `0 2px 8px #0004` |
+| Панель | 1px hub-border | Не задан |
+| Header | Нижняя1px hub-border | Не задан |
+| Карточка | 1px hub-border; demo-contrast2px | 15px |
+| Folder-head | Без общей рамки, missing нижняя1px dashed | Inherit |
+| Монограмма | Резерв1px, normal transparent; HC условная цветная граница, missing dashed | 14px |
+| Действие | 1px hub-outline | 7px |
+| Info/refresh | 1px transparent | Автором не задан; возможен UA-default |
+| История | Верхняя1px hub-border при наличии действий | Не задан |
+| Tooltip | 1px hub-focus, shadow0 2px 8px #0004 | Не задан |
+| Current header | outline1px contrastActive, offset−1; insetshadow2px0 focus | Inherit |
+| Focus-visible | outline2px hub-focus, offset2px | По элементу |
 
-`--hub-outline` берётся из `--vscode-contrastBorder` (fallback transparent): прозрачная рамка всё равно занимает1px. Тёмная/светлая/оригинальная палитры не меняют размеры шрифтов или отступов. Единственная дополнительная толщина карточки в семи демо —2px у контрастных монограмм. `forced-colors:active` — отдельный системный режим, не синоним демо-темы: рамки получают ButtonText, current-outline2px Highlight, disabled — GrayText. Контуры фокуса остаются2px; итог системных цветов требует runtime-проверки. Hover/expanded сами по себе толщину рамки и padding не меняют. Все приведённые border/radius/shadow/outline px фиксированы CSS, не умножаются вручную на B; browser zoom масштабирует их штатно.
+Original current имеет shadow:none/прозрачный фон, border карточки#8ab599 и зелёную пометку. Forced-colors использует системные цвета, current-outline2px Highlight; монограмма Canvas/CanvasText. Обычные темы не имеют видимой рамки знака, рамки карточек сохраняются. Все4темы имеют одинаковые размеры кроме контрастной толщины карточки.
 
-## Tooltip: единая геометрия и взаимодействие
+## Tooltip и движение
 
-Один переиспользуемый popup на панель: position:fixed, z-index20, border-box; hidden→display:none. Padding `(8/13)B X` (B13:8px вертикально,10/12px горизонтально), типографика/рамка/тень прежние.
+Tooltip один на панель, fixed/z20/hidden→display:none. Width:max-content/max-width330px, height:auto/max-height:none/overflow:visible; normal wrapping/anywhere. Left=owner.left,top=owner.bottom без viewport-fit. Pointer-events:none/tabIndex−1; только hover источника, немедленный leave, Escape. У header один fullpath-owner, дата/missing без отдельного popup. При pointermove внутри/на границе видимого rect popup скрывается в том же событии; owner dismissed до реального leave/reentry. Никакой интерактивной прокрутки или focus-показа. За Webview события/рисование недоступны, clipping возможен.
 
-`width:max-content;max-width:330px;height:auto;max-height:none;overflow:visible;white-space:normal;overflow-wrap:anywhere`. Интерактивной прокрутки нет. `left=trigger.left;top=trigger.bottom` без viewport-fit, минимальных полей или сдвига. Scroll/resize обновляют только якорь. Длинный текст растёт вниз и может выйти/обрезаться за границами поверхности; Webview не перекрывает соседний редактор.
+Аккордеон320мс, reduced motion0. Easing1−(1−p)^3; height от измеренного start до scrollHeight/0, затем auto/0. На каждом кадре scrollTop компенсирует изменение head.top; после перехода минимальная поправка при head выше панели или head.bottom+40px ниже.40px — фиксированный запас начала деталей. Край списка ограничивает компенсацию, быстрые нажатия сохраняют последнее намерение. Закрытые детали inert/aria-hidden.
 
-Все popup pointer-events:none/tabIndex−1, только hover источника, immediate leave (0мс). Нет hover-удержания самого popup, grace120мс или показа по фокусу. Escape скрывает. Внутри header-плашки один fullpath-owner: переходы между потомками не меняют показ. Дата/missing без отдельных popup. Остальные подсказки используют ровно ту же механику.
+Панель overflow:auto/overflow-anchor:none/scrollbar-gutter:stable. Имя переносится anywhere, identity min-width0; диалоги nowrap/overflowhidden/ellipsis; кнопки переносятся. Ширины260/320/400 и B13/16/20 — сценарии проверки, не фиксированные widths. Zoom не компенсируется inverse-scale. Не уменьшать шрифт ради числа помещающихся карточек.
 
-## Переносы, высота секции и движение
+## Только оболочка локального стенда
 
-Панель `overflow:auto`, `overflow-anchor:none`, `scrollbar-gutter:stable`; собственная ширина гибкая. У identity/name/details/actions min-width0 где задано, имя переносится через overflow-wrap:anywhere; диалог white-space nowrap + overflow hidden + text-overflow ellipsis. Tooltip переносится, кнопки могут переносить текст. Нет фиксированного количества помещающихся карточек. Прокрутка предпочтительнее уменьшения шрифта. Ширины260/320/400px — проверочные сценарии, не фиксированные widths компонентов. Zoom/DPI не компенсировать inverse-scale.
+Body margin0; review padding23px26px, h1 24px/600 margin15px0 9px, абзац13px/1,6, ссылка12px. Nav flex-wrap/gap14px/margin-top12px/font12px. Внешняя подпись темы13px/600/margin-bottom12px. Grid repeat(auto-fit,minmax(270px,400px)),gap26px/padding26px; example min-width0/scroll-margin20px. При viewport≤380px grid block/padding8px, example margin-bottom22px. Height790px — только стенд, в Webview доступная высота секции. Эти величины не фиксируют sidebar и не должны вытеснять Explorer.
 
-Аккордеон **320мс**, reduced motion **0мс**. Easing в JS `1−(1−p)^3`; height меняется от измеренного текущего значения до scrollHeight либо0, после завершения — auto либо0px. Компенсация scrollTop удерживает верх выбранной плашки по её фактической координате на каждом кадре. После перехода, если плашка выше viewport панели, scrollTop корректируется до её верха; при раскрытии проверяется `head.bottom+40px`, и недостающая часть прокручивается. **40px — текущий фиксированный запас показа начала деталей**, не высота кнопки или новый B-token. Край списка ограничивает компенсацию. Быстрые клики сохраняют последнее намерение; закрытые детали inert/aria-hidden, не входят в Tab-порядок.
+## Проверка
 
-## Только оболочка локального сравнения — не размеры VSIX
-
-Чтобы будущий агент не переносил параметры стенда в продукт: body margin0; review padding23px26px, h1 24px/600 с margin15px0 9px, абзац13px/1,6; ссылка12px, navigation gap14px/margin-top12px/font12px. Подпись темы вне панели —13px/600, margin-bottom12px. Theme-grid: колонки `repeat(auto-fit,minmax(270px,400px))`, gap26px, padding26px; theme-example min-width0 и scroll-margin20px. При viewport≤380px grid становится block с padding8px, секции имеют margin-bottom22px. Панель внутри стенда height790px. Эти размеры не фиксируют ширину sidebar или высоту Webview; в реальной интеграции использовать выделенное секции пространство. Внешние подписи галереи не входят в список продуктовой типографики выше.
-
-## Проверка спецификации
-
-Таблицы сверены с порядком stylesheet, специфичностью `.panel`/`.monograms`/`.inset`, media-правилами и JS inline-style. Проверены дробные значения при B13, размеры строк/кнопок и local links. Проверки verify-scale/verify-final подтверждают исходники и арифметику, но не фактические размеры browser layout, glyph, системных scrollbars или UA-radius. Пиксели screenshot и imagegen не использованы как CSSpx. Неуказанные min-height/hit-target/radius не дополняются вымышленными числами.
-
-## Цветовые группы без изменения геометрии
-
-UX26 и раздел16цветовых групп финального ТЗ заменяют прежние фиксированные tone-цвета знаков. `.panel .folder .mono` использует `--folder-bg/fg/border`, рассчитанные общим path→group алгоритмом. Border остаётся1px, radius4/14px, размеры32/36 при B13, шрифты и отступы неизменны. Missing сохраняет dashed, current свой независимый акцент. CSS-системные Canvas/CanvasText используются для forced-colors и нейтрального fallback. В каждой панели теперь16папок; высота стенда790px и обычная прокрутка сохранены.
-
-Актуальное уточнение UX26: мягкая16цветовая система снова действует во всех7темах, включая original. Светлые опорные заливки взяты из прежней пастельной палитры. Резерв border1px сохраняет геометрию, но в обычных темах цвет границы transparent; HC добавляет контрастную границу только если заливка недостаточно отличается от поверхности. Forced-colors — системные цвета/граница. Рамки самих карточек и весь размерный каскад не меняются.
-
-UX28: у header-плашки один owner полного пути; имя/знак/дата/current/missing/стрелка не имеют вложенных tooltip. Дата остаётся текстом, геометрия карточки не меняется.
-
-### Уточнение: попадание указателя в прямоугольник подсказки
-
-Для всех tooltip при каждом pointermove внутри доступной поверхности проверить clientX/clientY по getBoundingClientRect видимого popup. Попадание внутрь или на границу прямоугольника немедленно скрывает его в том же событии, даже если pointer-events:none направил событие в лежащий под ним owner. Сам popup по-прежнему не перехватывает pointer/click.
-
-После такого скрытия owner считается dismissed до настоящего ухода с него и нового входа; переходы между его потомками не возвращают popup. Новый отдельный owner может показывать свою подсказку. Escape сохраняет аналогичное подавление. Проверяется фактическая точка указателя, без прогнозирования траектории/таймера/кадровой задержки. За границей Webview события недоступны, прежние ограничения поверхности остаются.
+Каскад сверяется с исходниками, verify-scale и остальными локальными проверками. Formula/источники не подтверждают renderer, glyph, UA-radius, scrollbar, DPI/zoom screenshot. Размерный документ не вводит новые функции и не заменяет реальную приёмку Webview/VSIX.

@@ -2,23 +2,23 @@
 .panel {
  --hub-base:var(--vscode-font-size,13px);
  --hub-secondary:calc(var(--hub-base) * .9230769231);
- --hub-name-size:calc(var(--hub-base) * 1.1538461538);
- --hub-mono-size:calc(var(--hub-base) * 2.4615384615);
- --hub-row-y:calc(var(--hub-base) * .6153846154);
- --hub-row-x:calc(var(--hub-base) * .7692307692);
- --hub-gap:calc(var(--hub-base) * .6153846154);
+ --hub-name-size:calc(var(--hub-base) * 1.2307692308);
+ --hub-mono-size:calc(var(--hub-base) * 2.7692307692);
+ --hub-row-y:calc(var(--hub-base) * .8461538462);
+ --hub-row-x:calc(var(--hub-base) * .9230769231);
+ --hub-gap:calc(var(--hub-base) * .7692307692);
  font-family:var(--vscode-font-family,'Segoe UI',Arial,sans-serif);
  font-size:var(--hub-base);font-weight:var(--vscode-font-weight,400);line-height:1.4;
  padding-bottom:var(--hub-gap);
 }
 .panel header{font-size:var(--hub-base);line-height:1.4;padding:calc(var(--hub-base) * .4615384615) var(--hub-row-x);gap:var(--hub-gap)}
 .panel .intro{padding:var(--hub-gap) var(--hub-row-x);gap:calc(var(--hub-base) * .4615384615);min-width:0}
-.panel .intro h2{font-size:calc(var(--hub-base) * 1.0769230769);line-height:1.3;letter-spacing:normal;font-weight:600;min-width:0;overflow-wrap:anywhere}
+.panel .intro h2{font-size:calc(var(--hub-base) * 1.1538461538);line-height:1.3;letter-spacing:normal;font-weight:600;min-width:0;overflow-wrap:anywhere}
 .panel .info,.panel .refresh{flex-shrink:0;min-width:calc(var(--hub-base) * 1.8461538462);min-height:calc(var(--hub-base) * 1.8461538462);padding:calc(var(--hub-base) * .1538461538);font-size:var(--hub-base);line-height:1}
 .panel .refresh{font-size:calc(var(--hub-base) * 1.2307692308)}
 .panel .folders{padding:calc(var(--hub-base) * .2307692308) var(--hub-row-x) var(--hub-gap);gap:var(--hub-gap)}
 .panel .folder-head{padding:var(--hub-row-y) var(--hub-row-x);gap:var(--hub-gap)}
-.panel .mono{height:var(--hub-mono-size);flex:0 0 var(--hub-mono-size);font-size:var(--hub-base);line-height:1;font-weight:600;letter-spacing:normal}
+.panel .mono{height:var(--hub-mono-size);flex:0 0 var(--hub-mono-size);font-size:calc(var(--hub-base) * 1.1538461538);line-height:1;font-weight:700;letter-spacing:normal}
 .panel .name{font-size:var(--hub-name-size);line-height:1.3;font-weight:600;letter-spacing:normal;overflow-wrap:anywhere}
 .panel .current-label,.panel .activity,.panel .missing-label{font-size:var(--hub-secondary);line-height:1.4;letter-spacing:normal}
 .panel .current-label{margin-bottom:calc(var(--hub-base) * .1538461538)}
@@ -33,10 +33,6 @@
 .panel .tooltip{font-size:var(--hub-base);line-height:1.45;padding:calc(var(--hub-base) * .6153846154) var(--hub-row-x)}
 .panel .demo-status{font-size:var(--hub-base);line-height:1.4}
 .panel .demo-status:not(:empty){padding:var(--hub-gap) var(--hub-row-x)}
-/* Монограммы остаются крупнее и свободнее рамок, с исходными формами и палитрой. */
-.panel.monograms{--hub-name-size:calc(var(--hub-base) * 1.2307692308);--hub-mono-size:calc(var(--hub-base) * 2.7692307692);--hub-row-y:calc(var(--hub-base) * .8461538462);--hub-row-x:calc(var(--hub-base) * .9230769231);--hub-gap:calc(var(--hub-base) * .7692307692)}
-.panel.monograms .intro h2{font-size:calc(var(--hub-base) * 1.1538461538)}
-.panel.monograms .mono{font-size:calc(var(--hub-base) * 1.1538461538);font-weight:700}
 /* Узкая область меняет доступную ширину и переносы, а не размер шрифта. */
 .panel .identity{min-width:0;flex:1}
 
