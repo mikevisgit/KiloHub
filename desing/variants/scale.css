@@ -44,5 +44,5 @@
 .panel .detail > .history:first-child{margin-top:0;padding-top:0;border-top:0}
 
 /* Только знак получает устойчивую цветовую группу, не карточка или её статус. */
-.panel:not(.demo-original) .folder .mono{background:var(--folder-bg,var(--vscode-badge-background));color:var(--folder-fg,var(--vscode-badge-foreground));border-color:var(--folder-border,var(--hub-outline))}
+.panel .folder .mono{background:var(--folder-bg,var(--vscode-badge-background));color:var(--folder-fg,var(--vscode-badge-foreground));border-color:var(--folder-border,transparent)}
 @media(forced-colors:active){.panel .folder .mono{background:Canvas;color:CanvasText;border-color:CanvasText}}
