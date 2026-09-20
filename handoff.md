@@ -232,3 +232,9 @@ UX28: .folder-head — единственный fullpath-owner в обоих с�
 До исправления воспроизведено owner→popup полного пути: hidden=false/pointer-events:auto. По последнему уточнению «как и везде» теперь ВСЕtooltip имеют pointer-events:none/tabIndex−1 и немедленный leave. Удалены типовые исключения, onTip и120мс; длинные тексты width:max-content/max-width330px/heightauto без scroll/maxheight. Stable-переходы внутриheader, Escape и unclampedanchor сохранены. HTML пересобраны, ненужные data-tip-kind убраны.
 
 Обновлены UX27/28, финальноеТЗ и размеры без противоречащего hoverablelong. Профильный harness проверяет все прежние типы, owner→popup/owner→owner, отсутствие таймеров/focus, descendants/Escape/crosspanel; остальные4verify проходят. Отчёт reviews/design-instant-tooltips.md. Browser не использовался, production не менялся.
+
+### Геометрическое попадание в popup
+
+Воспроизведён случай pointer-events:none с owner под tooltip: прежде pointermove внутри прямоугольника не скрывал popup. Теперь общий capture-pointermove обработчик среды проверяет каждый видимый popup и скрывает его в том же событии при попадании clientX/Y (границы включены). Owner подавлен до настоящего leave/reentry, между потомками не появляется. Listener один на среду/окно для7панелей, повторная установка идемпотентна, отсоединённые панели убираются из списка наблюдения.
+
+Проверены до/после, края rect, отсутствие перехвата pointer, panel-local dismissal и повторный вход. ТЗ/UX/размеры дополнены; остальные5verify проходят. Отчёт reviews/design-tooltip-geometry-dismiss.md. Не заявляется реальный browser hit-testing/рендер; production не тронут.
