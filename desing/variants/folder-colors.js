@@ -1,5 +1,5 @@
 // Цвета знаков зависят от текущей поверхности; идентичность группы — только от пути.
-for(const panel of document.querySelectorAll('.panel')){
+for(const panel of document.querySelectorAll('.panel:not(.demo-original)')){
  function resolveSurface(element){
   const color=getComputedStyle(element).backgroundColor;
   const parent=element.parentElement?resolveSurface(element.parentElement):[37,37,38];

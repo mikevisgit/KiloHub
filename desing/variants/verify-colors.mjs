@@ -11,13 +11,14 @@ let reference=null,panels=0;
 for(const file of ['01-monograms.html','vscode-monograms/02-inset.html']){
  const html=fs.readFileSync(new URL(file,import.meta.url),'utf8');
  for(const panel of html.split('<section class="panel ').slice(1)){
+  if(panel.startsWith('monograms demo-original')){const original=panel.split('</section>')[0];assert.equal((original.match(/class="mono"/g)||[]).length,16);assert(!original.includes('data-color-group'));for(const tone of ['mint','peach','lavender','blue','gray'])assert(original.includes('folder '+tone));continue;}
   const entries=[...panel.split('</section>')[0].matchAll(/data-path="([^"]+)"[\s\S]*?data-color-group="(\d+)"/g)].map(m=>[m[1],Number(m[2])]);
   assert.equal(entries.length,16);assert.equal(new Set(entries.map(x=>x[1])).size,16);
   for(const [path,slot]of entries)assert.equal(C.group(path),slot);
   reference??=entries;assert.deepEqual(entries,reference);panels++;
  }
 }
-assert.equal(panels,7);
+assert.equal(panels,6);
 const runtime=fs.readFileSync(new URL('folder-colors.js',import.meta.url),'utf8');assert(runtime.includes('MutationObserver'));assert(runtime.includes('resolveSurface(panel)'));
 // Реальный обработчик смены темы на офлайн DOM-дубле: не заменяет браузер.
 let refresh;const events={};const panel={background:'rgb(37, 37, 38)',parentElement:null};
@@ -28,4 +29,4 @@ const before=rows.map(r=>r.mark.dataset.colorGroup);
 for(const surface of ['rgb(255, 255, 255)','rgb(0, 0, 0)','rgb(250, 250, 240)','color(display-p3 1 1 1)']){panel.background=surface;refresh([{target:panel}]);assert.deepEqual(rows.map(r=>r.mark.dataset.colorGroup),before);assert(rows.every(r=>r.properties['--folder-bg']));}
 assert(rows.every(r=>r.properties['--folder-bg']==='Canvas'));
 panel.background='rgb(37, 37, 38)';events.focus();const backgrounds=rows.map(r=>r.properties['--folder-bg']);rows.reverse();refresh([{target:panel}]);assert.deepEqual(rows.map(r=>r.properties['--folder-bg']),backgrounds.reverse());
-console.log(`PASS colors:112 marks,16 groups per panel; path equivalents; RGB4096×16 contrast min text ${minText.toFixed(2)}, border ${minBorder.toFixed(2)}. Source/algorithm only, not browser theme rendering.`);
+console.log(`PASS colors:96 adaptive marks,16 groups per themed panel; original16 legacy pastel marks; path equivalents; RGB4096×16 contrast min text ${minText.toFixed(2)}, border ${minBorder.toFixed(2)}. Source/algorithm only, not browser theme rendering.`);
