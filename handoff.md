@@ -164,3 +164,13 @@ Production-код, база Kilo, нормативные `req/step1/`, исхо�
 По разрешению пользователя исправлены все шесть замечаний `reviews/design-ux-application-audit.md`: 35 полных путей, сохранение tooltip при focus/hover и Escape, очередь последнего намерения аккордеона, строгая календарная валидация ISO дат, ограничение tooltip viewport с прокруткой, обновление подписей на локальной полуночи/focus/visibility/refresh без перезаписи fixture timestamps. Анимация теперь 320 мс (вдвое медленнее), reduced motion — 0; UX пункт17 и итоговое ТЗ синхронизированы.
 
 Пересобраны оба HTML; прошли `node --check` для demo.js/activity.cjs/interaction.cjs/build-final.mjs, `node desing/variants/verify-final.mjs`, `node desing/variants/verify-regressions.mjs`, `git diff --check`. Новые регрессии проверяют реальные helpers и tooltip handlers офлайн, не браузер. Подробности: `reviews/design-ux-fixes.md`. Текущий/новый выбор, дата и missing scope сохранены; production/VSIX/данные не тронуты. Браузерный рендер/scroll/клавиатурная приёмка по-прежнему не подтверждены; независимое ревью исправлений ожидается отдельно.
+
+### Соразмерность шрифтов и размеров VS Code
+
+По запросу пользователя сравнены реальный screenshot Step1 (2539×1445) и одобренная imagegen-иллюстрация (1662×946). Независимые измерения нормализованного шага строк (~5,5% ширины sidebar) и умеренного увеличения имён (~1,1–1,2× native glyph) учтены как отношения, не CSSpx. Исходный screenshot сохранён без изменений в `desing/screenshots/kilo-hub-step1-scale-reference.png`; иллюстрация `kilo-hub-inset-in-vscode-preview.png` не редактировалась.
+
+Общий `desing/variants/scale.css` использует vscode-font-family/font-size/font-weight и fallback13px/400. Для7тем: действия/диалоги/tooltip1B, metadata12/13B, имена15/13B и16/13B, знаки32/13B и36/13B; отступы производны от B. Два дизайна сохраняют разные формы/палитры/плотность. Удалены прежние фиксированные product font-size и media-уменьшение текста, добавлены UXп24 и точная таблица финального ТЗ. Данные и JS не менялись, анимация320мс сохранена.
+
+Проверки: генерация обоих HTML, verify-final.mjs, verify-regressions.mjs, verify-scale.mjs и git diff --check. Ширины260/320/400 и B13/16/20 проверены исходниками/арифметикой, не браузером. При260/B13 текстовая область≈138px у рамок и122px у монограмм (с условным резервом17px scrollbar). Результаты: `reviews/design-vscode-scale-review.md`. DPI/zoom исходника неизвестны; реальный рендер, screenshot-match и200% zoom ещё требуют ручной приёмки. Production/VSIX не менялись; fileURL policy не обходилась.
+
+Независимая проверка CSS-каскада завершена без существенных findings; дополнительно проверен узкий стенд244px внутри viewport260 и contrast border. Реальный рендер остаётся непроверенным.
