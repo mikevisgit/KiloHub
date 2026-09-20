@@ -1,37 +1,51 @@
 import fs from 'node:fs';
-import assert from 'node:assert/strict';import{createRequire}from'node:module';
-const{installTooltip}=createRequire(import.meta.url)('./interaction.cjs');
-function harness(){
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+
+const {installTooltip,TOOLTIP_GRACE_MS}=createRequire(import.meta.url)('./interaction.cjs');
+
+function harness({width=320,height=260}={}){
  const handlers={},global={},timers=new Map();let serial=0;const nodes=[];
- const tip={hidden:true,style:{},offsetWidth:120,offsetHeight:50,getBoundingClientRect:()=>({left:5,top:5,right:125,bottom:55}),contains:n=>n===tip};
+ const tip={hidden:true,style:{},attrs:{},offsetWidth:200,offsetHeight:100,contains:n=>n===tip,setAttribute(k,v){this.attrs[k]=v;}};
  const panel={querySelector:()=>tip,contains:n=>nodes.includes(n)||n===tip,addEventListener:(k,f)=>handlers[k]=f};
- const env={innerWidth:320,innerHeight:260,addEventListener:(k,f)=>global[k]=f,setTimeout:f=>{timers.set(++serial,f);return serial;},clearTimeout:k=>timers.delete(k)};
- const make=(text,kind)=>{const n={dataset:{tip:text,tipKind:kind},attrs:{},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},closest(){return this;},getBoundingClientRect:()=>({left:10,bottom:20}),focus(){}};nodes.push(n);return n;};
- installTooltip(panel,env);return{handlers,global,tip,timers,make,panel,env,tick(){for(const f of [...timers.values()])f();timers.clear();}};
+ const env={innerWidth:width,innerHeight:height,addEventListener:(k,f)=>global[k]=f,setTimeout:f=>{const id=++serial;timers.set(id,f);return id;},clearTimeout:id=>timers.delete(id)};
+ const make=(text,rect={left:10,top:10,bottom:30})=>{const n={dataset:{tip:text},attrs:{},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},closest(){return this;},getBoundingClientRect:()=>rect};nodes.push(n);return n;};
+ installTooltip(panel,env);
+ return{handlers,global,tip,timers,make,panel,env,tick(){const pending=[...timers.values()];timers.clear();for(const f of pending)f();}};
 }
-for(const kind of ['button','instant',undefined]){
- const h=harness(),{handlers:e,tip}=h,a=h.make('source A',kind),b=h.make('source B',kind);
- assert.equal(e.focusin,undefined);assert.equal(e.focusout,undefined);e.keydown({key:'Tab'});assert(tip.hidden);
- e.pointerover({target:a});assert(!tip.hidden);assert.equal(tip.style.pointerEvents,'none');assert.equal(tip.tabIndex,-1);
- e.pointerout({target:a,relatedTarget:tip});assert(tip.hidden);assert(!a.attrs['aria-describedby']);assert.equal(h.timers.size,0);
- e.pointerover({target:a});e.pointerout({target:a,relatedTarget:b});assert.equal(tip.textContent,'source B');assert(!a.attrs['aria-describedby']);assert.equal(h.timers.size,0);
- e.keydown({key:'Escape'});assert(tip.hidden);e.pointerover({target:b});assert(tip.hidden);e.pointerout({target:b,relatedTarget:null});e.pointerover({target:a});assert(!tip.hidden);
- const foreign=harness().make('foreign');e.pointerout({target:a,relatedTarget:foreign});assert(tip.hidden);
- const child=()=>({closest:()=>a});const kids=Array.from({length:6},child);let writes=0;Object.defineProperty(tip,'textContent',{get(){return this.text;},set(v){this.text=v;writes++;}});
- e.pointerover({target:kids[0]});const before=writes;for(let i=1;i<6;i++){e.pointerout({target:kids[i-1],relatedTarget:kids[i]});e.pointerover({target:kids[i],relatedTarget:kids[i-1]});assert(!tip.hidden);assert.equal(writes,before);assert.equal(h.timers.size,0);}
-}
-const styles=fs.readFileSync(new URL('refinements.css',import.meta.url),'utf8');assert(styles.includes('width:max-content;max-width:330px'));assert(styles.includes('height:auto;max-height:none;overflow:visible'));assert(!styles.includes('100vw'));
-console.log('PASS all tooltips: source-hover only, immediate leave, pointer-pass-through, no timers/Tabstop/focus handlers, stable descendants, Escape and cross-panel ownership; no interactive scroll or viewport fit. No browser rendering asserted.');
 
-const hit=harness(),owner=hit.make('overlay source'),child={closest:()=>owner};hit.handlers.pointerover({target:owner});
-hit.global.pointermove({target:owner,clientX:20,clientY:20});assert(hit.tip.hidden);assert(!owner.attrs['aria-describedby']);assert.equal(hit.tip.style.pointerEvents,'none');
-hit.handlers.pointerover({target:owner});assert(hit.tip.hidden,'same owner must remain dismissed');
-hit.handlers.pointerout({target:owner,relatedTarget:child});hit.handlers.pointerover({target:child,relatedTarget:owner});assert(hit.tip.hidden);
-hit.handlers.pointerout({target:child,relatedTarget:null});hit.handlers.pointerover({target:owner});assert(!hit.tip.hidden,'real leave and reentry restores');
-hit.global.pointermove({target:owner,clientX:126,clientY:20});assert(!hit.tip.hidden,'outside rectangle does not dismiss');
-hit.global.pointermove({target:owner,clientX:125,clientY:55});assert(hit.tip.hidden,'rectangle edge is included');
-const peer=harness(),peerOwner=peer.make('peer');peer.handlers.pointerover({target:peerOwner});assert(!peer.tip.hidden,'dismissal is panel-local');
-console.log('PASS geometry hit: same-event hide through underlying owner, no child reappearance, reentry reset, rectangle edges, panel-local dismissal.');
+assert.equal(TOOLTIP_GRACE_MS,120);
+const h=harness(),{handlers:e,tip}=h,a=h.make('source A'),b=h.make('source B');
+assert.equal(tip.attrs.role,'tooltip');assert.equal(tip.tabIndex,-1);const stableId=tip.id;
 
-const same=hit.global.pointermove;installTooltip(hit.panel,hit.env);assert.equal(hit.global.pointermove,same,'repeat install keeps listener');
-const second=harness();installTooltip({querySelector:()=>second.tip,contains:()=>false,addEventListener(){}},hit.env);assert.equal(hit.global.pointermove,same,'second panel shares global listener');
+e.pointerover({target:a,relatedTarget:null});
+assert(!tip.hidden,'pointer shows immediately');assert.equal(a.attrs['aria-describedby'],stableId);assert.equal(tip.style.pointerEvents,'auto');
+e.pointerout({target:a,relatedTarget:b});e.pointerover({target:b,relatedTarget:a});assert.equal(tip.textContent,'source B');assert(!a.attrs['aria-describedby']);assert.equal(b.attrs['aria-describedby'],stableId);
+e.pointerout({target:b,relatedTarget:a});e.pointerover({target:a,relatedTarget:b});assert.equal(tip.textContent,'source A');
+e.pointerout({target:a,relatedTarget:null});assert(!tip.hidden);assert.equal(h.timers.size,1,'grace is used only across the pointer gap');
+e.pointerover({target:tip,relatedTarget:null});assert(!tip.hidden);assert.equal(a.attrs['aria-describedby'],stableId);assert.equal(h.timers.size,0,'popup hover cancels grace');
+e.pointerout({target:tip,relatedTarget:null});assert(!tip.hidden);h.tick();assert(tip.hidden);assert(!a.attrs['aria-describedby']);
+
+e.focusin({target:a});assert(!tip.hidden,'focus shows immediately');
+e.pointerover({target:a,relatedTarget:null});e.pointerout({target:a,relatedTarget:null});h.tick();assert(!tip.hidden,'focus keeps popup visible');
+e.keydown({key:'Escape'});assert(tip.hidden);assert(!a.attrs['aria-describedby']);
+e.pointerover({target:a,relatedTarget:null});assert(tip.hidden,'Escape suppresses the same active source');
+e.pointerout({target:a,relatedTarget:null});h.tick();assert(tip.hidden,'focus still keeps Escape suppression active');
+e.focusout({target:a,relatedTarget:null});e.focusin({target:a});assert(!tip.hidden,'complete leave and blur resets Escape suppression');assert.equal(tip.id,stableId);
+
+e.focusout({target:a,relatedTarget:b});assert.equal(tip.textContent,'source B');assert(!a.attrs['aria-describedby']);assert.equal(b.attrs['aria-describedby'],stableId);
+e.focusout({target:b,relatedTarget:null});assert(tip.hidden);
+
+const edge=harness(),owner=edge.make('long text',{left:290,top:220,bottom:235});edge.handlers.pointerover({target:owner,relatedTarget:null});
+assert.equal(edge.tip.style.maxWidth,'304px');assert.equal(edge.tip.style.maxHeight,'208px');assert.equal(edge.tip.style.left,'112px');assert.equal(edge.tip.style.top,'116px','tooltip falls back above near the lower edge');
+const narrow=harness({width:100,height:80}),narrowOwner=narrow.make('narrow',{left:90,top:10,bottom:25});narrow.handlers.pointerover({target:narrowOwner,relatedTarget:null});assert.equal(narrow.tip.style.maxWidth,'84px');assert.equal(narrow.tip.style.left,'8px');
+
+const second=installTooltip(h.panel,h.env);assert.equal(second.tip,tip);assert.equal(tip.id,stableId,'repeat install preserves stable tooltip ID');
+
+const css=fs.readFileSync(new URL('refinements.css',import.meta.url),'utf8');
+assert(css.includes('max-width:min(330px,calc(100vw - 16px))'));assert(css.includes('max-height:calc(100vh - 16px)'));assert(css.includes('pointer-events:auto'));assert(css.includes('overflow:auto'));
+const html=fs.readFileSync(new URL('01-monograms.html',import.meta.url),'utf8');
+assert.equal((html.match(/<div class="tooltip" role="tooltip" hidden><\/div>/g)||[]).length,4,'popup has no interactive children');
+for(const match of html.matchAll(/<p class="dialogue"([^>]*)>([^<]+)<\/p>/g)){assert(!/tabindex|data-tip/.test(match[1]));assert.equal(match[1],` aria-label="${match[2]}"`);}
+
+console.log('PASS accessible tooltips: immediate pointer/focus, popup hover, crossing grace, Escape lifecycle, stable ARIA, viewport fit/above fallback, bounded long text, passive dialogue names. No browser rendering asserted.');

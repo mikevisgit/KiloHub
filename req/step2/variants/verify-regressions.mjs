@@ -13,21 +13,16 @@ for(const reduced of [false,true]){
  q.request('A');await flush();q.request('B');q.request('A');if(pending.length)pending.shift()();await Promise.resolve();q.request('C');await flush();assert.equal(applied,'C');
  for(const x of ['A','B','C','A','B','B','C'])q.request(x);await flush();assert.equal(applied,'C');
 }
-// Офлайн реальные tooltip-обработчики, без браузера или имитации рендера.
+// Офлайн вызываются реальные tooltip-обработчики; геометрия задаётся числами, а не браузерным layout.
 const handlers={},timers=new Map();let serial=0;
-const tip={hidden:true,style:{},offsetWidth:200,offsetHeight:100,contains:n=>n===tip,removeAttribute(){}};
+const tip={hidden:true,style:{},attrs:{},offsetWidth:200,offsetHeight:100,contains:n=>n===tip,setAttribute(k,v){this.attrs[k]=v;}};
 const panel={querySelector:()=>tip,contains:n=>n===a||n===b||n===tip,addEventListener:(name,fn)=>handlers[name]=fn};
-const env={innerWidth:300,innerHeight:240,addEventListener(){},setTimeout:fn=>{timers.set(++serial,fn);return serial;},clearTimeout:id=>timers.delete(id)};
-const make=name=>({dataset:{tip:name},attrs:{},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},closest(){return this;},getBoundingClientRect:()=>({left:280,bottom:220}),focus(){}});
-const a=make('A'),b=make('B');installTooltip(panel,env);const tick=()=>{for(const fn of [...timers.values()])fn();timers.clear();};
-assert.equal(handlers.focusin,undefined);assert.equal(handlers.focusout,undefined);assert(tip.hidden);
-handlers.keydown({key:'Tab'});assert(tip.hidden);
-handlers.pointerover({target:a});assert(!tip.hidden);assert(a.attrs['aria-describedby']);
-handlers.pointerover({target:b});assert.equal(tip.textContent,'B');handlers.keydown({key:'Escape'});tick();assert(tip.hidden);assert(!b.attrs['aria-describedby']);
-handlers.pointerover({target:b});assert(tip.hidden,'Escape remains dismissed for same trigger');
-handlers.pointerout({target:b,relatedTarget:null});tick();assert(tip.hidden);
-handlers.pointerover({target:a});handlers.pointerout({target:a,relatedTarget:tip});assert(tip.hidden);handlers.pointerover({target:tip});tick();assert(tip.hidden);handlers.pointerover({target:a});assert.equal(tip.textContent,'A');assert.equal(tip.tabIndex,-1);
-assert.equal(tip.style.left,'280px');assert.equal(tip.style.top,'220px');assert.equal(tip.style.maxHeight,undefined);assert.equal(tip.style.maxWidth,undefined);
-const foreign=make('Другая панель');handlers.pointerout({target:tip,relatedTarget:foreign});tick();assert(tip.hidden,'Foreign panel must not own this tooltip');
-for(const file of ['01-monograms.html']){const html=fs.readFileSync(new URL(file,import.meta.url),'utf8');const names=[...html.matchAll(/class="folder-head" data-tip="([^"]+)"[\s\S]*?class="name">([^<]+)<\/span>/g)];assert.equal(names.length,64);for(const [,path,name]of names)assert.equal(path,`D:\\Примеры\\${name}`.replaceAll('\\\\','\\'));assert(!html.includes('${'));assert(html.includes('interaction.cjs'));}
-console.log('PASS regressions: paths64, strict/leap/timezone dates, midnight/current-first, latest accordion intent (normal/reduced), tooltip hover-only/pointer/Escape/timers/unclamped anchor. DOM rendering not tested.');
+const env={innerWidth:300,innerHeight:240,addEventListener(){},setTimeout:fn=>{const id=++serial;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id)};
+const make=name=>({dataset:{tip:name},attrs:{},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},closest(){return this;},getBoundingClientRect:()=>({left:280,top:200,bottom:220})});
+const a=make('A'),b=make('B');installTooltip(panel,env);const tick=()=>{const pending=[...timers.values()];timers.clear();for(const fn of pending)fn();};
+handlers.pointerover({target:a,relatedTarget:null});assert(!tip.hidden);assert(a.attrs['aria-describedby']);assert.equal(tip.style.left,'92px');assert.equal(tip.style.top,'96px');
+handlers.pointerout({target:a,relatedTarget:null});handlers.pointerover({target:tip,relatedTarget:null});tick();assert(!tip.hidden,'popup hover survives source leave');
+handlers.pointerout({target:tip,relatedTarget:null});tick();assert(tip.hidden);
+handlers.focusin({target:b});assert.equal(tip.textContent,'B');handlers.keydown({key:'Escape'});assert(tip.hidden);handlers.focusin({target:b});assert(tip.hidden);handlers.focusout({target:b,relatedTarget:null});handlers.focusin({target:b});assert(!tip.hidden);
+for(const file of ['01-monograms.html']){const html=fs.readFileSync(new URL(file,import.meta.url),'utf8');const names=[...html.matchAll(/class="folder-head" data-tip="([^"]+)"[\s\S]*?class="name">([^<]+)<\/span>/g)];assert.equal(names.length,64);for(const [,path,name]of names)assert.equal(path,`D:\\Примеры\\${name}`.replaceAll('\\\\','\\'));assert(!html.includes('${'));assert(html.includes('interaction.cjs'));assert(!/<p class="dialogue"[^>]*(?:tabindex|data-tip)/.test(html));}
+console.log('PASS regressions: paths64, strict/leap/timezone dates, midnight/current-first, latest accordion intent, accessible tooltip pointer/focus/popup/Escape and viewport fit. DOM rendering not tested.');
