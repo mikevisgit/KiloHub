@@ -42,3 +42,12 @@
  --vscode-editorWarning-foreground:#ffff00;
  color-scheme:dark;
 }
+.demo-original{
+ --vscode-sideBar-background:#f5f7f4;--vscode-sideBar-foreground:#24302b;--vscode-sideBar-border:#dce3dc;--vscode-sideBarTitle-foreground:#24302b;
+ --vscode-foreground:#24302b;--vscode-descriptionForeground:#58675e;--vscode-disabledForeground:#637168;
+ --vscode-badge-background:#d3e9d9;--vscode-badge-foreground:#274f3a;
+ --vscode-list-inactiveSelectionBackground:#ffffff;--vscode-list-inactiveSelectionForeground:#24302b;--vscode-list-hoverBackground:#eef2ed;--vscode-list-hoverForeground:#24302b;
+ --vscode-button-background:#24302b;--vscode-button-foreground:#ffffff;--vscode-button-hoverBackground:#34483d;
+ --vscode-button-secondaryBackground:#ffffff;--vscode-button-secondaryForeground:#24302b;--vscode-button-secondaryHoverBackground:#eef2ed;
+ --vscode-focusBorder:#24723e;--vscode-contrastBorder:transparent;--vscode-contrastActiveBorder:transparent;--vscode-editorWarning-foreground:#80501e;color-scheme:light;
+}

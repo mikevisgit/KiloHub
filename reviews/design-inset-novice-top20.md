@@ -2,7 +2,7 @@
 
 ## Объект и метод
 
-Объект: [макет «Тонкие рамки»](../desing/variants/vscode-monograms/02-inset.html), [общие стили](../desing/variants/vscode-monograms/panel.css), [три демо-палитры](../desing/variants/vscode-monograms/demo-themes.css). Основание scope: [ТЗ v2](../desing/design-task-v2.md). Проверена версия файлов из коммита `aa2b9f6`.
+Объект: [макет «Тонкие рамки»](../desing/variants/vscode-monograms/02-inset.html), общие стили `desing/variants/vscode-monograms/panel.css` (историческая версия в указанном коммите), три демо-палитры `desing/variants/vscode-monograms/demo-themes.css` (историческая версия в указанном коммите). Основание scope: [ТЗ v2](../desing/design-task-v2.md). Проверена версия файлов из коммита `aa2b9f6`.
 
 Это экспертный разбор HTML/CSS с мысленным сценарием человека, впервые работающего в VS Code. **Реальных участников, наблюдений за ними и браузерного рендера не было.** «Новичок может подумать» ниже — гипотеза, а не цитата пользователя. Отсутствие описанного состояния в этом макете не доказывает отсутствие его в работающем расширении.
 
