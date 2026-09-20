@@ -322,6 +322,7 @@ export async function projectSessions(
 
       folders[index] = {
         id: directory.key,
+        path: directory.path,
         uri: directory.uri,
         name: directory.name,
         available,

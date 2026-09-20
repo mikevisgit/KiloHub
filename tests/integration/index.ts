@@ -103,6 +103,7 @@ function testTreeProviderContract(): void {
     provider.setFolders([{
       id: 'c:\\missing project',
       uri: 'file:///C:/Missing%20Project',
+      path: 'C:\\Missing Project',
       name: 'Missing Project',
       available: false,
       lastKiloActivityAt: '2026-09-19T20:00:00.000Z',

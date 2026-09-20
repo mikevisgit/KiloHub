@@ -82,6 +82,7 @@ void test('filters non-root and archived sessions and groups paths case-insensit
 
   assert.equal(folders.length, 1);
   assert.equal(folders[0].id, 'c:\\work\\project');
+  assert.equal(folders[0].path, 'C:\\work\\project');
   assert.equal(folders[0].uri, 'file:///C:/work/project');
   assert.deepEqual(folders[0].conversations.map(({ id }) => id), ['two', 'one']);
   assert.deepEqual(checked, ['C:\\work\\project']);
@@ -98,7 +99,9 @@ void test('chooses a deterministic display path for equivalent case variants', a
   ], { isDirectoryAvailable: available });
 
   assert.equal(firstOrder[0].uri, 'file:///C:/repo');
+  assert.equal(firstOrder[0].path, 'C:\\repo');
   assert.equal(reversedOrder[0].uri, firstOrder[0].uri);
+  assert.equal(reversedOrder[0].path, firstOrder[0].path);
   assert.equal(reversedOrder[0].name, firstOrder[0].name);
 });
 

@@ -19,6 +19,7 @@ export interface KiloConversation {
 
 export interface KiloFolder {
   id: string;
+  path: string;
   uri: string;
   name: string;
   available: boolean;
