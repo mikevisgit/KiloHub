@@ -2,7 +2,7 @@
 
 ## Текущее состояние
 
-- Статус: выполняются планирование реализации и исследование среды.
+- Статус: Step 1 реализован, упакован и установлен; подготовлена отдельная задача на визуальную проработку без расширения функционального scope.
 - Ветка: `master`.
 - Исходный коммит: `9642700 Align Step 1 with Kilo SQLite history`.
 - В начале работы рабочее дерево было чистым.
@@ -26,7 +26,7 @@
 - [x] Зафиксированы границы отдельных каталогов.
 - [x] Запущены независимые исследования SQLite, UI и packaging.
 - [x] Подтверждены реальное расположение и schema `kilo.db` на основании read-only данных.
-- [ ] Выбран и доказан SQLite runtime внутри упакованного расширения: `node:sqlite` и production bundle доказаны в Extension Host `1.105.1`; установленный VSIX proof ещё не выполнен.
+- [x] Выбран и доказан SQLite runtime внутри упакованного расширения: `node:sqlite` подтверждён development и installed Extension Host tests.
 - [x] Реализованы metadata adapter и domain projection.
 - [x] Реализованы Activity Bar view и команды.
 - [x] Завершены автоматические тесты и независимое ревью; code remediation и повторные проверки выполнены.
@@ -92,3 +92,11 @@ Release gate выполнен командами: `npm ci`, `npm audit --audit-l
 ## Следующее действие
 
 Артефакт готов к локальной установке. Единственный эксплуатационный residual gate — визуальный клик-тест трёх переходов в disposable GUI window; command wiring и exact VS Code API options проверены автоматически, но автоматический installed test намеренно не заменяет workspace и не открывает Explorer.
+
+## Дизайн-задача
+
+- Задача для дизайнера: `desing/design-task.md`.
+- Baseline dark/collapsed: `desing/screenshots/image.png`.
+- Baseline light/expanded: `desing/screenshots/image2.png`.
+- Функциональный scope Step 1 зафиксирован неизменяемым; новые команды, сущности, settings, webview и функции запрещены.
+- Во втором скриншоте присутствуют локальные metadata. В задаче зафиксирован запрет на публикацию и требование обезличить итоговые макеты.
