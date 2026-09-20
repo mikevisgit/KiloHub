@@ -42,3 +42,7 @@
 
 /* Без команд история начинается сразу: не резервируем пустое место под действия. */
 .panel .detail > .history:first-child{margin-top:0;padding-top:0;border-top:0}
+
+/* Только знак получает устойчивую цветовую группу, не карточка или её статус. */
+.panel .folder .mono{background:var(--folder-bg,var(--vscode-badge-background));color:var(--folder-fg,var(--vscode-badge-foreground));border-color:var(--folder-border,var(--hub-outline))}
+@media(forced-colors:active){.panel .folder .mono{background:Canvas;color:CanvasText;border-color:CanvasText}}

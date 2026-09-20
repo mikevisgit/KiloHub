@@ -88,7 +88,7 @@
 | Карточка рамок | 1px solid `--hub-border` во всех3темах | Radius4px |
 | Карточка монограмм | 1px solid `--hub-border`; в `.demo-contrast`2px | Radius15px во всех4темах |
 | Плашка | Отдельной общей рамки нет; missing border-bottom1px dashed | Radius inherit от карточки |
-| Монограмма | 1px solid `--hub-outline`; missing dashed | Radius4px / 14px |
+| Монограмма | 1px solid `--folder-border` с fallback `--hub-outline`; missing dashed | Radius4px / 14px |
 | Действие | 1px solid `--hub-outline`; missing1px dashed `--hub-border` | Radius2px / 7px |
 | История | border-top1px solid `--hub-border` | Без собственной карточки |
 | Info/refresh | 1px solid transparent | Radius не задан авторским CSS: возможен UA-default, точное число не нормативно |
@@ -119,3 +119,7 @@
 ## Проверка спецификации
 
 Таблицы сверены с порядком stylesheet, специфичностью `.panel`/`.monograms`/`.inset`, media-правилами и JS inline-style. Проверены дробные значения при B13, размеры строк/кнопок и local links. Проверки verify-scale/verify-final подтверждают исходники и арифметику, но не фактические размеры browser layout, glyph, системных scrollbars или UA-radius. Пиксели screenshot и imagegen не использованы как CSSpx. Неуказанные min-height/hit-target/radius не дополняются вымышленными числами.
+
+## Цветовые группы без изменения геометрии
+
+UX26 и раздел16цветовых групп финального ТЗ заменяют прежние фиксированные tone-цвета знаков. `.panel .folder .mono` использует `--folder-bg/fg/border`, рассчитанные общим path→group алгоритмом. Border остаётся1px, radius4/14px, размеры32/36 при B13, шрифты и отступы неизменны. Missing сохраняет dashed, current свой независимый акцент. CSS-системные Canvas/CanvasText используются для forced-colors и нейтрального fallback. В каждой панели теперь16папок; высота стенда790px и обычная прокрутка сохранены.
