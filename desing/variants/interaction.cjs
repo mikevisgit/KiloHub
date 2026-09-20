@@ -7,15 +7,13 @@
  }
  function installTooltip(panel,env=root){
   const tip=panel.querySelector('.tooltip');tip.id=`tooltip-${Math.random().toString(36).slice(2)}`;tip.tabIndex=-1;
-  let owner=null,hover=null,onTip=false,timer;
-  const simple=node=>node?.dataset?.tipKind==='button';const dismissed=new Set();
+  let owner=null,hover=null;
+  const dismissed=new Set();
   const trigger=node=>{const candidate=node?.closest?.('[data-tip]');return candidate&&panel.contains(candidate)?candidate:null;};
-  const isTip=node=>!!node&&(node===tip||tip.contains(node));
   function hide(){tip.hidden=true;owner?.removeAttribute('aria-describedby');owner=null;}
   function position(){if(!owner||tip.hidden)return;const r=owner.getBoundingClientRect();tip.style.left=`${r.left}px`;tip.style.top=`${r.bottom}px`;}
-  function reconcile(){env.clearTimeout(timer);for(const item of dismissed)if(item!==hover&&!onTip)dismissed.delete(item);const next=onTip?owner:hover;if(!next||dismissed.has(next)){hide();return;}owner?.removeAttribute('aria-describedby');owner=next;tip.textContent=owner.dataset.tip;tip.style.pointerEvents=simple(owner)?'none':'auto';tip.tabIndex=-1;tip.hidden=false;owner.setAttribute('aria-describedby',tip.id);position();}
-  panel.addEventListener('pointerover',e=>{if(trigger(e.target)&&trigger(e.target)===trigger(e.relatedTarget))return;onTip=!simple(owner)&&isTip(e.target);if(!onTip)hover=trigger(e.target);reconcile();});
-  panel.addEventListener('pointerout',e=>{if(trigger(e.target)&&trigger(e.target)===trigger(e.relatedTarget))return;const immediate=simple(trigger(e.target))||simple(owner);onTip=!immediate&&isTip(e.relatedTarget);hover=onTip?hover:trigger(e.relatedTarget);env.clearTimeout(timer);if(immediate)reconcile();else timer=env.setTimeout(reconcile,120);});
+  function reconcile(){for(const item of dismissed)if(item!==hover)dismissed.delete(item);const next=hover;if(!next||dismissed.has(next)){hide();return;}owner?.removeAttribute('aria-describedby');owner=next;tip.textContent=owner.dataset.tip;tip.style.pointerEvents='none';tip.tabIndex=-1;tip.hidden=false;owner.setAttribute('aria-describedby',tip.id);position();}
+  for(const type of ['pointerover','pointerout'])panel.addEventListener(type,e=>{const target=trigger(e.target),related=trigger(e.relatedTarget);if(target&&target===related)return;hover=type==='pointerover'?target:related;reconcile();});
   panel.addEventListener('keydown',e=>{if(e.key==='Escape'){for(const item of [owner,hover])if(item)dismissed.add(item);hide();}});
   panel.addEventListener('scroll',position);env.addEventListener('resize',position);
   return {tip,position};

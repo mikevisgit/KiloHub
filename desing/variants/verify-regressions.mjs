@@ -26,7 +26,7 @@ handlers.pointerover({target:a});assert(!tip.hidden);assert(a.attrs['aria-descri
 handlers.pointerover({target:b});assert.equal(tip.textContent,'B');handlers.keydown({key:'Escape'});tick();assert(tip.hidden);assert(!b.attrs['aria-describedby']);
 handlers.pointerover({target:b});assert(tip.hidden,'Escape remains dismissed for same trigger');
 handlers.pointerout({target:b,relatedTarget:null});tick();assert(tip.hidden);
-handlers.pointerover({target:a});handlers.pointerout({target:a,relatedTarget:tip});handlers.pointerover({target:tip});tick();assert(!tip.hidden);assert.equal(tip.textContent,'A');assert.equal(tip.tabIndex,-1);
+handlers.pointerover({target:a});handlers.pointerout({target:a,relatedTarget:tip});assert(tip.hidden);handlers.pointerover({target:tip});tick();assert(tip.hidden);handlers.pointerover({target:a});assert.equal(tip.textContent,'A');assert.equal(tip.tabIndex,-1);
 assert.equal(tip.style.left,'280px');assert.equal(tip.style.top,'220px');assert.equal(tip.style.maxHeight,undefined);assert.equal(tip.style.maxWidth,undefined);
 const foreign=make('Другая панель');handlers.pointerout({target:tip,relatedTarget:foreign});tick();assert(tip.hidden,'Foreign panel must not own this tooltip');
 for(const file of ['01-monograms.html','vscode-monograms/02-inset.html']){const html=fs.readFileSync(new URL(file,import.meta.url),'utf8');const names=[...html.matchAll(/class="folder-head" data-tip="([^"]+)"[\s\S]*?class="name">([^<]+)<\/span>/g)];assert.equal(names.length,file.startsWith('01')?64:48);for(const [,path,name]of names)assert.equal(path,`D:\\Примеры\\${name}`.replaceAll('\\\\','\\'));assert(!html.includes('${'));assert(html.includes('interaction.cjs'));}

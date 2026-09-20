@@ -226,3 +226,9 @@ UX27 реализован в обоих макетах/7темах: команд
 UX28: .folder-head — единственный fullpath-owner в обоих состояниях. Date/missing/name не имеют вложенных tooltip; дата остаётся видимой, updateDates не возвращает data-tip. Переходы между потомками не перезаписывают popup и не запускают hide/timer. Позиция exact owner.left/bottom безclamp; width:max-content/max-width330px/max-height360px — контентные пределы, не fit-to-window. Reviewer заметил width:auto shrink-to-fit; устранено явным max-content.
 
 Все5verify проходят:112head имеют ровно1owner, пути правильны, потомки стабильны, anchornear-edge не сдвигается, прежние mouse-only/actions/colors/dates/320мс сохранены. ТЗ/UX13/19/22/27/28 и размеры согласованы; Webview не сможет рисовать поверх соседнего VS Code, clipping принят как ограничение, host-поверхность не добавлена. Отчёт reviews/design-single-head-tooltip.md. Рендер не проверялся.
+
+### Все подсказки исчезают при уходе с источника
+
+До исправления воспроизведено owner→popup полного пути: hidden=false/pointer-events:auto. По последнему уточнению «как и везде» теперь ВСЕtooltip имеют pointer-events:none/tabIndex−1 и немедленный leave. Удалены типовые исключения, onTip и120мс; длинные тексты width:max-content/max-width330px/heightauto без scroll/maxheight. Stable-переходы внутриheader, Escape и unclampedanchor сохранены. HTML пересобраны, ненужные data-tip-kind убраны.
+
+Обновлены UX27/28, финальноеТЗ и размеры без противоречащего hoverablelong. Профильный harness проверяет все прежние типы, owner→popup/owner→owner, отсутствие таймеров/focus, descendants/Escape/crosspanel; остальные4verify проходят. Отчёт reviews/design-instant-tooltips.md. Browser не использовался, production не менялся.

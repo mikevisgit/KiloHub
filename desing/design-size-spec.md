@@ -98,13 +98,13 @@
 
 `--hub-outline` берётся из `--vscode-contrastBorder` (fallback transparent): прозрачная рамка всё равно занимает1px. Тёмная/светлая/оригинальная палитры не меняют размеры шрифтов или отступов. Единственная дополнительная толщина карточки в семи демо —2px у контрастных монограмм. `forced-colors:active` — отдельный системный режим, не синоним демо-темы: рамки получают ButtonText, current-outline2px Highlight, disabled — GrayText. Контуры фокуса остаются2px; итог системных цветов требует runtime-проверки. Hover/expanded сами по себе толщину рамки и padding не меняют. Все приведённые border/radius/shadow/outline px фиксированы CSS, не умножаются вручную на B; browser zoom масштабирует их штатно.
 
-## Tooltip: путь, заголовки и полные названия
+## Tooltip: единая геометрия и взаимодействие
 
-- Одна переиспользуемая подсказка на панель; `position:fixed`, z-index20, border-box; hidden → display:none. Padding `(8/13)B X`: при B13 V8, H10/12px. Font/line-height указаны в типографике.
-- CSS max-width330px и max-height360px; width:max-content, height auto по содержимому. JS не задаёт viewport-пределы. Это фиксированные пределы читабельности, не подгонка к размерам окна.
-- `overflow:auto`, `overscroll-behavior:contain`, `scrollbar-gutter:stable`, white-space normal, overflow-wrap anywhere. Все popup имеют tabIndex−1; информационные прокручиваются мышью, а подсказка кнопки имеет pointer-events:none; размер scrollbar зависит от среды, в таблицах он не фиксируется.
-- `left=trigger.left`, `top=trigger.bottom` в CSSpx относительно viewport. Без сдвига/минимальных полей/fit. Scroll/resize обновляют якорь. Popup может выйти за видимую область или обрезаться; граница Webview/iframe не позволяет перекрывать соседний редактор. Отдельная host-поверхность не реализуется.
-- Для информационных подсказок pointerout grace120мс; удерживает только hover. Для кнопок grace0: уход мыши скрывает немедленно. Focus/Tab не показывают и не удерживают ни один popup. Escape закрывает оба режима. Это не длительность анимации карточки. Полного пути в потоке деталей нет, отдельные размеры под него не резервировать.
+Один переиспользуемый popup на панель: position:fixed, z-index20, border-box; hidden→display:none. Padding `(8/13)B X` (B13:8px вертикально,10/12px горизонтально), типографика/рамка/тень прежние.
+
+`width:max-content;max-width:330px;height:auto;max-height:none;overflow:visible;white-space:normal;overflow-wrap:anywhere`. Интерактивной прокрутки нет. `left=trigger.left;top=trigger.bottom` без viewport-fit, минимальных полей или сдвига. Scroll/resize обновляют только якорь. Длинный текст растёт вниз и может выйти/обрезаться за границами поверхности; Webview не перекрывает соседний редактор.
+
+Все popup pointer-events:none/tabIndex−1, только hover источника, immediate leave (0мс). Нет hover-удержания самого popup, grace120мс или показа по фокусу. Escape скрывает. Внутри header-плашки один fullpath-owner: переходы между потомками не меняют показ. Дата/missing без отдельных popup. Остальные подсказки используют ровно ту же механику.
 
 ## Переносы, высота секции и движение
 
