@@ -15,6 +15,7 @@ for(const [file,count]of [['01-monograms.html',4],['vscode-monograms/02-inset.ht
   assert.equal(body.includes('class="actions"'),!missing);
   if(current&&!missing){assert(body.includes('Показать файлы папки'));assert(!body.includes('>Открыть в'));}
   assert(body.includes('class="history"'));assert(body.includes('class="activity"'));
+  const head=body.split('<div class="detail-wrap')[0];assert.equal((head.match(/data-tip=/g)||[]).length,1,'one head tooltip owner');assert(head.includes('class="folder-head" data-tip="D:'));assert(!/<span class="(?:name|activity|missing-label)"[^>]*data-tip/.test(head));
  }
  assert.equal((html.match(/aria-expanded="true"/g)||[]).length,count);assert.equal((html.match(/Вы сейчас здесь/g)||[]).length,count);
  for(const forbidden of ['<time','class="path"','class="hint"','<ul','Открыть в новом окне','Ваши папки'])assert(!html.includes(forbidden),forbidden);
@@ -31,3 +32,5 @@ for(const file of walk(root).filter(f=>/\.(css|html|js|cjs)$/.test(f))){const bo
 const css=fs.readFileSync(path.join(root,'demo-themes.css'),'utf8');const lum=hex=>{const rgb=hex.match(/\w\w/g).map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;};
 for(const theme of ['original','dark','light','contrast']){const block=css.match(new RegExp(`\\.demo-${theme}\\{([\\s\\S]*?)\\}`))[1];const vars=Object.fromEntries([...block.matchAll(/--vscode-([\w-]+):#([0-9a-f]{6})/g)].map(m=>[m[1],m[2]]));let min=99;for(const [fg,bg]of [['sideBar-foreground','sideBar-background'],['descriptionForeground','sideBar-background'],['button-foreground','button-background'],['button-secondaryForeground','button-secondaryBackground'],['badge-foreground','badge-background'],['list-inactiveSelectionForeground','list-inactiveSelectionBackground'],['editorWarning-foreground','sideBar-background'],['descriptionForeground','list-inactiveSelectionBackground'],['list-hoverForeground','list-hoverBackground'],['button-foreground','button-hoverBackground'],['button-secondaryForeground','button-secondaryHoverBackground']]){const a=lum(vars[fg]),b=lum(vars[bg]),ratio=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);min=Math.min(min,ratio);assert(ratio>=4.5,`${theme} ${fg} ${ratio}`);}console.log(`${theme}: minimum text contrast ${min.toFixed(2)}:1`);}
 console.log('PASS: 2 concepts, 7 themes; structure, local dependencies, dates and ordering. No browser/runtime rendering asserted.');
+
+assert(!fs.readFileSync(path.join(root,'demo.js'),'utf8').includes('date.dataset.tip'),'activity refresh must not restore date tooltip');

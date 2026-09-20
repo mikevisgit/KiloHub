@@ -220,3 +220,9 @@ UX27 реализован в обоих макетах/7темах: команд
 Последнее уточнение UX27 отменяет focus-появление/удержание всех tooltip. Удалены focusin/focusout и modality-tracking из installTooltip, popup всегда tabIndex−1. Hover кнопок скрывается сразу, длинные подсказки сохраняют hover/мышиную прокрутку/grace120мс. Escape/aria-describedby cleanup сохранены; demo.js и клавиатурная активация/фокус элементов не менялись.
 
 ТЗ/UX27/размеры согласованы с hover-only. Проверены focus-only no-popup, Tab не меняет owner, leave скрывает несмотря на фокус, long hover и cross-panel, прежние проверки цветов/дат/аккордеона. Отчёт reviews/design-hover-only-tooltips.md. Браузерная проверка не проводилась, production не тронут.
+
+### Единая подсказка плашки без viewport-fit
+
+UX28: .folder-head — единственный fullpath-owner в обоих состояниях. Date/missing/name не имеют вложенных tooltip; дата остаётся видимой, updateDates не возвращает data-tip. Переходы между потомками не перезаписывают popup и не запускают hide/timer. Позиция exact owner.left/bottom безclamp; width:max-content/max-width330px/max-height360px — контентные пределы, не fit-to-window. Reviewer заметил width:auto shrink-to-fit; устранено явным max-content.
+
+Все5verify проходят:112head имеют ровно1owner, пути правильны, потомки стабильны, anchornear-edge не сдвигается, прежние mouse-only/actions/colors/dates/320мс сохранены. ТЗ/UX13/19/22/27/28 и размеры согласованы; Webview не сможет рисовать поверх соседнего VS Code, clipping принят как ограничение, host-поверхность не добавлена. Отчёт reviews/design-single-head-tooltip.md. Рендер не проверялся.

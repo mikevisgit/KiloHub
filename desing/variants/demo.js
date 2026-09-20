@@ -4,8 +4,7 @@ for(const panel of document.querySelectorAll('.panel')){
  const data=rows.map(row=>({id:row.dataset.id,name:row.dataset.name,activity:row.dataset.activity,current:row.classList.contains('current'),row}));
  function updateDates(){const now=new Date(),ordered=HubActivity.sortFolders(data,now);for(const item of ordered){
   const position=[...container.children].indexOf(item.row);const expected=ordered.indexOf(item);if(position!==expected)container.insertBefore(item.row,container.children[expected]||null);
-  const date=item.row.querySelector('.activity');date.textContent=HubActivity.relative(item.activity,now);date.dataset.tip=`Последняя активность в Kilo: ${new Date(item.activity).toLocaleString('ru-RU')}`;
-  const head=item.row.querySelector('.folder-head');head.dataset.tip=item.row.querySelector('.name').dataset.tip;
+  const date=item.row.querySelector('.activity');date.textContent=HubActivity.relative(item.activity,now);
  }}
  updateDates();let midnightTimer;
  function scheduleDates(){clearTimeout(midnightTimer);updateDates();const n=new Date(),next=new Date(n.getFullYear(),n.getMonth(),n.getDate()+1);midnightTimer=setTimeout(scheduleDates,Math.max(1,+next-+n+20));}

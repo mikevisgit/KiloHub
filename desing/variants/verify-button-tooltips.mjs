@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import assert from 'node:assert/strict';import{createRequire}from'node:module';
 const{installTooltip}=createRequire(import.meta.url)('./interaction.cjs');
 function harness(){
@@ -24,3 +25,11 @@ e.pointerout({target:long,relatedTarget:tip});e.pointerover({target:tip});h.tick
 e.pointerout({target:tip,relatedTarget:a});e.pointerover({target:a});assert.equal(tip.tabIndex,-1);assert.equal(tip.style.pointerEvents,'none');assert(!long.attrs['aria-describedby']);
 const other=harness(),foreign=other.make('other','button');e.pointerout({target:a,relatedTarget:foreign});assert(tip.hidden);other.handlers.pointerover({target:foreign});assert(!other.tip.hidden);
 console.log('PASS button tooltip handlers: immediate leave, transparent hit testing declaration, no popup Tabstop, hover only; focus/Tab cannot show or pin, Escape, next owner, long hover/scroll mode and cross-panel ownership. No browser rendering asserted.');
+
+const z=harness(),head=z.make('full path'),child=()=>({closest:()=>head});let writes=0;
+Object.defineProperty(z.tip,'textContent',{get(){return this.text;},set(v){this.text=v;writes++;}});
+const kids=Array.from({length:6},child);z.handlers.pointerover({target:kids[0]});const initialWrites=writes;
+for(let i=1;i<kids.length;i++){z.handlers.pointerout({target:kids[i-1],relatedTarget:kids[i]});z.handlers.pointerover({target:kids[i],relatedTarget:kids[i-1]});assert(!z.tip.hidden);assert.equal(writes,initialWrites);assert.equal(z.timers.size,0);}
+console.log('PASS unified head descendants: stable owner, no tooltip writes/hide/timers between children.');
+
+const styles=fs.readFileSync(new URL('refinements.css',import.meta.url),'utf8');assert(styles.includes('width:max-content;max-width:330px'));assert(!styles.includes('100vw'));
