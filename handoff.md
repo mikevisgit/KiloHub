@@ -256,3 +256,7 @@ Feasibility-аудит завершён. Макеты визуально пол�
 ### Нормативный пакет Step 2 готов к реализации
 
 Синхронизированы канон, Уточнение ТЗ, размерное приложение, accessible tooltip reference, test matrix, manual checklist и `specs/step2-implementation-plan.md`. Первый цикл независимых ревью записан в `reviews/step2-spec-review-01.md`; найденные tooltip/header/current/monogram/theme/actions/testability противоречия устранены. Все шесть offline design verify, дополнительные tooltip regressions, `node --check`, локальные Markdown links и `git diff --check` проходят. На этом этапе production всё ещё соответствует Step 1 и VSIX `0.1.0`; реализация и release evidence Step 2 начинаются только после отдельного нормативного коммита.
+
+### Baseline перед production Step 2
+
+После normative commit `88ea354` из чистого tracked tree выполнены `NODE_TLS_REJECT_UNAUTHORIZED=1`, `npm ci`, audit, полный `npm test`, exact `verify:vsix` и `npm run test:installed`. Результат: audit `0 vulnerabilities`, 27/27 unit/subtests, development и installed Extension Host VS Code `1.105.1` exit `0`, fixture DB неизменна. Сохранённый Step 1 artifact `dist/kilo-hub-0.1.0-win32-x64.vsix`: 12857 bytes, SHA-256 `13AC15017C69D333E0B370770961473D1DC5FAEFD6459B7FD88BF15510F67743`. Повторная упаковка 0.1.0 не выполнялась после docs-only commits, чтобы не менять reproducible ZIP timestamp; exact archive и fresh bundle hashes проверены existing verifier.

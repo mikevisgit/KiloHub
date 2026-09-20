@@ -8,7 +8,7 @@
 
 - [x] Требования, дизайн, размерная спецификация, тестовая матрица и ручной чек-лист подготовлены и прочитаны.
 - [x] Текущий production-код Step 1, unit/integration tests, build/package/install scripts и ограничения release-процесса изучены.
-- [ ] Baseline Step 1 зафиксирован повторным чистым прогоном.
+- [x] Baseline Step 1 зафиксирован повторным чистым прогоном.
 - [ ] Production-реализация Step 2 начата.
 - [ ] Production-тесты, независимые ревью, VSIX `0.2.0`, установка и ручная приёмка выполнены.
 
@@ -102,14 +102,14 @@ Gate M0: выполнен только как requirements/design preparation.
 
 Зависимости: M0.
 
-- [ ] Зафиксировать полный исходный commit и убедиться, что нормативные изменения Step 2 и этот план находятся в истории Git отдельно от production-кода.
-- [ ] Проверить `git status`, `git diff`, `git diff --check` и `git log --oneline -10`; не затрагивать параллельные изменения.
-- [ ] Выполнить `npm ci`, `npm audit --audit-level=high`, `npm test`, `npm run package`, `npm run test:installed` на baseline `0.1.0`.
-- [ ] Повторно доказать неизменность fixture DB и Step 1 read-only/WAL/busy/path-safety regressions.
-- [ ] Запустить шесть команд из `req/step2/START_HERE.md`; после генерации убедиться, что reference-макет воспроизводим и не оставляет неожиданный diff.
-- [ ] Записать версии Node/npm/VS Code, commit, команды и baseline SHA-256 в `handoff.md`/`docs/`, не выдавая offline reference за production evidence.
+- [x] Зафиксировать полный исходный commit и убедиться, что нормативные изменения Step 2 и этот план находятся в истории Git отдельно от production-кода.
+- [x] Проверить `git status`, `git diff`, `git diff --check` и `git log --oneline -10`; не затрагивать параллельные изменения.
+- [x] Выполнить secure-TLS `npm ci`, `npm audit --audit-level=high`, `npm test`, exact verifier и `npm run test:installed` на baseline `0.1.0`. Повторная упаковка не выполнялась, чтобы не менять timestamp уже выпущенного Step 1 VSIX после docs-only commits.
+- [x] Повторно доказать неизменность fixture DB и Step 1 read-only/WAL/busy/path-safety regressions.
+- [x] Запустить шесть команд из `req/step2/START_HERE.md`; после генерации убедиться, что reference-макет воспроизводим и не оставляет неожиданный diff.
+- [x] Записать версии Node/npm/VS Code, commit, команды и baseline SHA-256 в `handoff.md`, не выдавая offline reference за production evidence.
 
-Gate M1: baseline полностью зелёный, рабочее дерево чистое, известен exact commit Step 1 и нет необъяснённых изменений. Любое падение сначала устраняется или записывается как blocker; Webview-код до этого не начинается.
+Gate M1: пройден. Нормативный commit Step 2: `88ea354`; production baseline остаётся Step 1 `0.1.0`, VSIX SHA-256 `13AC15017C69D333E0B370770961473D1DC5FAEFD6459B7FD88BF15510F67743`.
 
 ### M2. Чистая presentation logic
 
