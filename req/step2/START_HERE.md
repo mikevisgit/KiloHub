@@ -5,19 +5,19 @@
 1. Прочитать [каноническое ТЗ](ТЗ%20реализации%20дизайна%20VSIX.md). Оно содержит все действующие UX-решения и является единственным источником требований дизайна.
 2. Прочитать его нормативное [размерное приложение](design-size-spec.md). Оно уточняет геометрию, не создаёт альтернативных требований.
 3. Посмотреть [галерею](variants/index.html) и [макет монограмм](variants/01-monograms.html): original/dark/light/high contrast, по16папок в каждой теме. Это один дизайн, не варианты на выбор.
-4. Перед реализацией прочитать [AGENTS](../AGENTS.md), [план](../specs/step1-implementation-plan.md), [handoff](../handoff.md) и [нормативный Step 1](../req/step1/01-requirements.md). Сохранить модель данных/read-only/metadata; визуальные изменения Step 2 заданы каноническим ТЗ.
+4. Перед реализацией прочитать [agents](../../agents.md), [план](../../specs/step1-implementation-plan.md), [handoff](../../handoff.md) и [нормативный Step 1](../step1/01-requirements.md). Сохранить модель данных/read-only/metadata; визуальные изменения Step 2 заданы каноническим ТЗ.
 
 ## Сборка и проверка локального макета
 
 Из корня проекта, без установки зависимостей:
 
 ```powershell
-node desing/variants/build-final.mjs
-node desing/variants/verify-final.mjs
-node desing/variants/verify-regressions.mjs
-node desing/variants/verify-scale.mjs
-node desing/variants/verify-colors.mjs
-node desing/variants/verify-button-tooltips.mjs
+node req/step2/variants/build-final.mjs
+node req/step2/variants/verify-final.mjs
+node req/step2/variants/verify-regressions.mjs
+node req/step2/variants/verify-scale.mjs
+node req/step2/variants/verify-colors.mjs
+node req/step2/variants/verify-button-tooltips.mjs
 ```
 
 Генератор создаёт только index.html и01-monograms.html. Открывать их локально вручную, сервер не нужен. Макет не вызывает команды VS Code и не читает Kilo. Demo-themes.css — только демонстрационные палитры; реальный Webview получает --vscode-* от редактора. Остальные CSS/JS рядом — действующие зависимости макета и офлайн-проверок.

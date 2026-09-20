@@ -95,9 +95,9 @@ Release gate выполнен командами: `npm ci`, `npm audit --audit-l
 
 ## Дизайн-задача
 
-- Задача для дизайнера: `desing/design-task.md`.
-- Baseline dark/collapsed: `desing/screenshots/image.png`.
-- Baseline light/expanded: `desing/screenshots/image2.png`.
+- Историческая задача для дизайнера: `req/step2/old_donotuse/design-task.md`.
+- Baseline dark/collapsed: `req/step2/screenshots/image.png`.
+- Baseline light/expanded: `req/step2/screenshots/image2.png`.
 - Функциональный scope Step 1 зафиксирован неизменяемым; новые команды, сущности, settings, webview и функции запрещены.
 - Во втором скриншоте присутствуют локальные metadata. В задаче зафиксирован запрет на публикацию и требование обезличить итоговые макеты.
 
@@ -246,3 +246,7 @@ UX28: .folder-head — единственный fullpath-owner в обоих с�
 В desing/old_donotuse перенесены6файлов: design-task.md, design-task-v2.md, UX правки.md, variants/README.md, variants/vscode-monograms/02-inset.html и screenshots/kilo-hub-inset-in-vscode-preview.png. Их содержимое сохранено, добавлен поясняющий README. Архив не является runnable dependency/requirements. Активны3реальных baseline-screenshot как evidence, выбранный HTML с4темами/64папками, галерея и необходимые CSS/JS/5проверок.
 
 Генератор больше не создаёт другой дизайн; inset-CSS ветки убраны, размерный каскад сведён к тем же фактическим размерам монограмм. Все5verify проходят, verify-final проверяет локальные ссылки всего активного desing исключаяархив и запрещает активные зависимости наархив. Сравнены6archivepayload с прежними отслеживаемыми версиями. Реальный browser/VSIX/темы/клавиатурная приёмка не выполнены; ограничение Webviewtooltip сохраняется, production/reqStep1/БД не менялись.
+
+### Перенос дизайн-пакета в нормативный Step 2
+
+По прямому запросу пользователя папка `desing/` целиком перенесена в `req/step2/`. Канон: `req/step2/ТЗ реализации дизайна VSIX.md`; вход: `req/step2/START_HERE.md`; размерное приложение: `req/step2/design-size-spec.md`; последовательные ответы пользователя записываются в `req/step2/02-уточнение-ТЗ.md`. Старые упоминания `desing/` выше сохраняются как исторический журнал путей на момент соответствующей работы и не являются актуальными командами.
