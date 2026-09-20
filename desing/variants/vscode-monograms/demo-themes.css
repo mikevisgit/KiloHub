@@ -1,0 +1,44 @@
+/* Только палитры автономного демо. В будущей интеграции этот файл не подключать:
+   значения --vscode-* должны приходить из VS Code. Это не копии всех штатных тем. */
+.demo-dark{
+ --vscode-sideBar-background:#252526;--vscode-sideBar-foreground:#cccccc;
+ --vscode-sideBar-border:#424245;--vscode-sideBarTitle-foreground:#cccccc;
+ --vscode-sideBarSectionHeader-background:#2d2d30;--vscode-sideBarSectionHeader-foreground:#cccccc;
+ --vscode-foreground:#cccccc;--vscode-descriptionForeground:#aaaaaa;--vscode-disabledForeground:#949494;
+ --vscode-badge-background:#424249;--vscode-badge-foreground:#eeeeee;
+ --vscode-list-inactiveSelectionBackground:#37373d;--vscode-list-inactiveSelectionForeground:#e4e4e7;
+ --vscode-list-hoverBackground:#2f3033;--vscode-list-hoverForeground:#ededed;
+ --vscode-button-background:#0e639c;--vscode-button-foreground:#ffffff;--vscode-button-hoverBackground:#1177bb;
+ --vscode-button-secondaryBackground:#383a40;--vscode-button-secondaryForeground:#e0e0e0;--vscode-button-secondaryHoverBackground:#464950;
+ --vscode-focusBorder:#46a3e0;--vscode-contrastBorder:transparent;--vscode-contrastActiveBorder:transparent;
+ --vscode-editorWarning-foreground:#d9b96c;
+ color-scheme:dark;
+}
+.demo-light{
+ --vscode-sideBar-background:#f3f3f3;--vscode-sideBar-foreground:#333333;
+ --vscode-sideBar-border:#cccccc;--vscode-sideBarTitle-foreground:#333333;
+ --vscode-sideBarSectionHeader-background:#e7e7e7;--vscode-sideBarSectionHeader-foreground:#333333;
+ --vscode-foreground:#333333;--vscode-descriptionForeground:#626262;--vscode-disabledForeground:#717171;
+ --vscode-badge-background:#dddddf;--vscode-badge-foreground:#35353b;
+ --vscode-list-inactiveSelectionBackground:#e0e3e7;--vscode-list-inactiveSelectionForeground:#282828;
+ --vscode-list-hoverBackground:#e8e8e8;--vscode-list-hoverForeground:#222222;
+ --vscode-button-background:#0067aa;--vscode-button-foreground:#ffffff;--vscode-button-hoverBackground:#005b97;
+ --vscode-button-secondaryBackground:#e1e1e1;--vscode-button-secondaryForeground:#333333;--vscode-button-secondaryHoverBackground:#d5d5d5;
+ --vscode-focusBorder:#0067aa;--vscode-contrastBorder:transparent;--vscode-contrastActiveBorder:transparent;
+ --vscode-editorWarning-foreground:#795500;
+ color-scheme:light;
+}
+.demo-contrast{
+ --vscode-sideBar-background:#000000;--vscode-sideBar-foreground:#ffffff;
+ --vscode-sideBar-border:#a4a4a4;--vscode-sideBarTitle-foreground:#ffffff;
+ --vscode-sideBarSectionHeader-background:#000000;--vscode-sideBarSectionHeader-foreground:#ffffff;
+ --vscode-foreground:#ffffff;--vscode-descriptionForeground:#dddddd;--vscode-disabledForeground:#aaaaaa;
+ --vscode-badge-background:#000000;--vscode-badge-foreground:#ffffff;
+ --vscode-list-inactiveSelectionBackground:#151515;--vscode-list-inactiveSelectionForeground:#ffffff;
+ --vscode-list-hoverBackground:#151515;--vscode-list-hoverForeground:#ffffff;
+ --vscode-button-background:#000000;--vscode-button-foreground:#ffffff;--vscode-button-hoverBackground:#151515;
+ --vscode-button-secondaryBackground:#000000;--vscode-button-secondaryForeground:#ffffff;--vscode-button-secondaryHoverBackground:#151515;
+ --vscode-focusBorder:#ffff00;--vscode-contrastBorder:#a4a4a4;--vscode-contrastActiveBorder:#ffff00;
+ --vscode-editorWarning-foreground:#ffff00;
+ color-scheme:dark;
+}
