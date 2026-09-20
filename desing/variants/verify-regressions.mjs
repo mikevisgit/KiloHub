@@ -20,13 +20,14 @@ const panel={querySelector:()=>tip,contains:n=>n===a||n===b||n===tip,addEventLis
 const env={innerWidth:300,innerHeight:240,addEventListener(){},setTimeout:fn=>{timers.set(++serial,fn);return serial;},clearTimeout:id=>timers.delete(id)};
 const make=name=>({dataset:{tip:name},attrs:{},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},closest(){return this;},getBoundingClientRect:()=>({left:280,bottom:220}),focus(){}});
 const a=make('A'),b=make('B');installTooltip(panel,env);const tick=()=>{for(const fn of [...timers.values()])fn();timers.clear();};
-handlers.focusin({target:a});handlers.pointerover({target:a});handlers.pointerout({relatedTarget:null});tick();assert(!tip.hidden);assert(a.attrs['aria-describedby']);
+assert.equal(handlers.focusin,undefined);assert.equal(handlers.focusout,undefined);assert(tip.hidden);
+handlers.keydown({key:'Tab'});assert(tip.hidden);
+handlers.pointerover({target:a});assert(!tip.hidden);assert(a.attrs['aria-describedby']);
 handlers.pointerover({target:b});assert.equal(tip.textContent,'B');handlers.keydown({key:'Escape'});tick();assert(tip.hidden);assert(!b.attrs['aria-describedby']);
 handlers.pointerover({target:b});assert(tip.hidden,'Escape remains dismissed for same trigger');
-handlers.pointerout({relatedTarget:null});tick();assert(tip.hidden,'Escape does not revive previously focused owner');
-handlers.pointerout({relatedTarget:null});handlers.focusout({relatedTarget:null});tick();handlers.focusin({target:a});handlers.focusout({relatedTarget:null});handlers.focusin({target:b});tick();assert(!tip.hidden);assert.equal(tip.textContent,'B');
-handlers.focusout({relatedTarget:null});handlers.pointerover({target:a});handlers.pointerout({relatedTarget:tip});handlers.pointerover({target:tip});tick();assert(!tip.hidden);assert.equal(tip.textContent,'A');
+handlers.pointerout({target:b,relatedTarget:null});tick();assert(tip.hidden);
+handlers.pointerover({target:a});handlers.pointerout({target:a,relatedTarget:tip});handlers.pointerover({target:tip});tick();assert(!tip.hidden);assert.equal(tip.textContent,'A');assert.equal(tip.tabIndex,-1);
 assert.equal(tip.style.maxHeight,'224px');assert.equal(tip.style.maxWidth,'284px');
-const foreign=make('Другая панель');handlers.pointerout({relatedTarget:foreign});handlers.focusout({relatedTarget:foreign});tick();assert(tip.hidden,'Foreign panel must not own this tooltip');
+const foreign=make('Другая панель');handlers.pointerout({target:tip,relatedTarget:foreign});tick();assert(tip.hidden,'Foreign panel must not own this tooltip');
 for(const file of ['01-monograms.html','vscode-monograms/02-inset.html']){const html=fs.readFileSync(new URL(file,import.meta.url),'utf8');const names=[...html.matchAll(/class="name" data-tip="([^"]+)">([^<]+)<\/span>/g)];assert.equal(names.length,file.startsWith('01')?64:48);for(const [,path,name]of names)assert.equal(path,`D:\\Примеры\\${name}`.replaceAll('\\\\','\\'));assert(!html.includes('${'));assert(html.includes('interaction.cjs'));}
-console.log('PASS regressions: paths112, strict/leap/timezone dates, midnight/current-first, latest accordion intent (normal/reduced), tooltip focus/pointer/Escape/timers/viewport bounds. DOM rendering not tested.');
+console.log('PASS regressions: paths112, strict/leap/timezone dates, midnight/current-first, latest accordion intent (normal/reduced), tooltip hover-only/pointer/Escape/timers/viewport bounds. DOM rendering not tested.');

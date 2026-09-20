@@ -214,3 +214,9 @@ UX26, финальное ТЗ и размерное приложение обн�
 UX27 реализован в обоих макетах/7темах: команды/refresh/info явно помечены data-tip-kind=button; их popup pointer-events:none/tabIndex−1, leave скрывает сразу. Pointer-induced focus не удерживает, Tab-focus удерживает до ухода/Escape. Длинные информационные подсказки сохранили hover/focus/прокрутку и grace120мс. ТЗ/размерное приложение согласованы с двумя режимами; задержка600мс/новое позиционирование не вводились.
 
 Проверка verify-button-tooltips вызывает реальные handlers: immediate leave, соседняя кнопка, focus modality, Escape/aria, переключение long/simple и панели. Прежние verify-regressions/final/scale/colors проходят. Отчёт reviews/design-button-tooltips.md. Browser hit-testing/рендер не проверены, production не менялся.
+
+### Tooltip только по наведению
+
+Последнее уточнение UX27 отменяет focus-появление/удержание всех tooltip. Удалены focusin/focusout и modality-tracking из installTooltip, popup всегда tabIndex−1. Hover кнопок скрывается сразу, длинные подсказки сохраняют hover/мышиную прокрутку/grace120мс. Escape/aria-describedby cleanup сохранены; demo.js и клавиатурная активация/фокус элементов не менялись.
+
+ТЗ/UX27/размеры согласованы с hover-only. Проверены focus-only no-popup, Tab не меняет owner, leave скрывает несмотря на фокус, long hover и cross-panel, прежние проверки цветов/дат/аккордеона. Отчёт reviews/design-hover-only-tooltips.md. Браузерная проверка не проводилась, production не тронут.

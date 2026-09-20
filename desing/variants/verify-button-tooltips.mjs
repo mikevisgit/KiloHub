@@ -12,12 +12,15 @@ const h=harness(),{handlers:e,global:g,tip}=h,a=h.make('action A','button'),b=h.
 e.pointerover({target:a});assert(!tip.hidden);assert.equal(tip.style.pointerEvents,'none');assert.equal(tip.tabIndex,-1);
 e.pointerout({target:a,relatedTarget:tip});assert(tip.hidden);assert(!a.attrs['aria-describedby']);assert.equal(h.timers.size,0);
 e.pointerover({target:b});assert.equal(tip.textContent,'action B');e.pointerout({target:b,relatedTarget:null});assert(tip.hidden);
-g.pointerdown({target:a});e.pointerover({target:a});e.focusin({target:a});e.pointerout({target:a,relatedTarget:null});assert(tip.hidden,'click focus does not pin');
-g.keydown({key:'Tab'});e.focusin({target:a});e.pointerover({target:a});e.pointerout({target:a,relatedTarget:null});assert(!tip.hidden,'keyboard focus pins');
-e.keydown({key:'Escape'});assert(tip.hidden);assert(!a.attrs['aria-describedby']);h.tick();assert(tip.hidden);
-e.focusout({relatedTarget:b});e.focusin({target:b});assert(!tip.hidden);assert.equal(tip.textContent,'action B');assert.equal(tip.style.pointerEvents,'none');
-e.focusout({relatedTarget:null});e.pointerover({target:long});assert.equal(tip.tabIndex,0);assert.equal(tip.style.pointerEvents,'auto');
+assert.equal(e.focusin,undefined);assert.equal(e.focusout,undefined);assert.equal(g.pointerdown,undefined);
+// Фокус не обрабатывается tooltip-модулем и не может показать/удержать popup.
+assert(tip.hidden);e.keydown({key:'Tab'});assert(tip.hidden);
+e.pointerover({target:a});e.keydown({key:'Tab'});assert.equal(tip.textContent,'action A');
+e.pointerout({target:a,relatedTarget:null});assert(tip.hidden);
+e.pointerover({target:b});e.keydown({key:'Escape'});assert(tip.hidden);assert(!b.attrs['aria-describedby']);
+e.pointerout({target:b,relatedTarget:null});
+e.pointerover({target:long});assert.equal(tip.tabIndex,-1);assert.equal(tip.style.pointerEvents,'auto');
 e.pointerout({target:long,relatedTarget:tip});e.pointerover({target:tip});h.tick();assert(!tip.hidden,'long remains hoverable');
 e.pointerout({target:tip,relatedTarget:a});e.pointerover({target:a});assert.equal(tip.tabIndex,-1);assert.equal(tip.style.pointerEvents,'none');assert(!long.attrs['aria-describedby']);
 const other=harness(),foreign=other.make('other','button');e.pointerout({target:a,relatedTarget:foreign});assert(tip.hidden);other.handlers.pointerover({target:foreign});assert(!other.tip.hidden);
-console.log('PASS button tooltip handlers: immediate leave, transparent hit testing declaration, no popup Tabstop, pointer-vs-keyboard focus, Escape, next owner, long hover/scroll mode and cross-panel ownership. No browser rendering asserted.');
+console.log('PASS button tooltip handlers: immediate leave, transparent hit testing declaration, no popup Tabstop, hover only; focus/Tab cannot show or pin, Escape, next owner, long hover/scroll mode and cross-panel ownership. No browser rendering asserted.');

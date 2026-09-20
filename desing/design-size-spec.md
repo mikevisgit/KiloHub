@@ -102,9 +102,9 @@
 
 - Одна переиспользуемая подсказка на панель; `position:fixed`, z-index20, border-box; hidden → display:none. Padding `(8/13)B X`: при B13 V8, H10/12px. Font/line-height указаны в типографике.
 - CSS fallback max-width `min(330px,100vw−16px)`, max-height `100dvh−16px`. **При показе JS устанавливает inline max-width `max(1,innerWidth−16)px` и max-height `max(1,innerHeight−16)px`: inline заменяет CSS-предел330px.** Поэтому330px нельзя считать действующим максимальным пределом открытой подсказки. Ширина/высота auto по содержимому, ограничены этими максимумами.
-- `overflow:auto`, `overscroll-behavior:contain`, `scrollbar-gutter:stable`, white-space normal, overflow-wrap anywhere. Информационная подсказка фокусируема для клавиатурной прокрутки; подсказка кнопки имеет tabIndex−1 и pointer-events:none; размер scrollbar зависит от среды, в таблицах он не фиксируется.
+- `overflow:auto`, `overscroll-behavior:contain`, `scrollbar-gutter:stable`, white-space normal, overflow-wrap anywhere. Все popup имеют tabIndex−1; информационные прокручиваются мышью, а подсказка кнопки имеет pointer-events:none; размер scrollbar зависит от среды, в таблицах он не фиксируется.
 - `left=max(8,min(trigger.left,viewportWidth−tooltipWidth−8))`; `top=max(8,min(trigger.bottom,viewportHeight−tooltipHeight−8))`. Положение в CSSpx относительно viewport, а не карточки; минимальные поля8px, зазор над нижним краем trigger не добавляется. При нехватке места подсказка может перекрывать часть владельца. При scroll/resize координата пересчитывается.
-- Для информационных подсказок pointerout grace120мс; focus/hover удерживают её. Для кнопок grace0: уход мыши скрывает немедленно; только клавиатурный фокус удерживает, клик-фокус не удерживает. Escape закрывает оба режима. Это не длительность анимации карточки. Полного пути в потоке деталей нет, отдельные размеры под него не резервировать.
+- Для информационных подсказок pointerout grace120мс; удерживает только hover. Для кнопок grace0: уход мыши скрывает немедленно. Focus/Tab не показывают и не удерживают ни один popup. Escape закрывает оба режима. Это не длительность анимации карточки. Полного пути в потоке деталей нет, отдельные размеры под него не резервировать.
 
 ## Переносы, высота секции и движение
 
