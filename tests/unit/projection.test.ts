@@ -82,9 +82,24 @@ void test('filters non-root and archived sessions and groups paths case-insensit
 
   assert.equal(folders.length, 1);
   assert.equal(folders[0].id, 'c:\\work\\project');
-  assert.equal(folders[0].uri, 'file:///C:/Work/Project');
+  assert.equal(folders[0].uri, 'file:///C:/work/project');
   assert.deepEqual(folders[0].conversations.map(({ id }) => id), ['two', 'one']);
-  assert.deepEqual(checked, ['C:\\Work\\Project']);
+  assert.deepEqual(checked, ['C:\\work\\project']);
+});
+
+void test('chooses a deterministic display path for equivalent case variants', async () => {
+  const firstOrder = await projectSessions([
+    session('lower', 'C:\\repo', { timeUpdated: 100 }),
+    session('upper', 'c:\\Repo', { timeUpdated: 100 }),
+  ], { isDirectoryAvailable: available });
+  const reversedOrder = await projectSessions([
+    session('upper', 'c:\\Repo', { timeUpdated: 100 }),
+    session('lower', 'C:\\repo', { timeUpdated: 100 }),
+  ], { isDirectoryAvailable: available });
+
+  assert.equal(firstOrder[0].uri, 'file:///C:/repo');
+  assert.equal(reversedOrder[0].uri, firstOrder[0].uri);
+  assert.equal(reversedOrder[0].name, firstOrder[0].name);
 });
 
 void test('uses untitled fallback and invokes the warning callback once', async () => {
@@ -175,6 +190,7 @@ void test('checks availability asynchronously once per folder and contains check
 });
 
 void test('skips malformed runtime records without losing valid records', async () => {
+  const warnings: string[] = [];
   const malformed = [
     session('', 'C:\\repo'),
     { ...session('bad-title', 'C:\\repo'), title: 42 },
@@ -184,13 +200,21 @@ void test('skips malformed runtime records without losing valid records', async 
   const folders = await projectSessions([
     ...malformed,
     session('valid', 'C:\\repo'),
-  ], { isDirectoryAvailable: available });
+    session('line\nbreak', '\\\\server\\share'),
+  ], {
+    isDirectoryAvailable: available,
+    onWarning: (warning) => warnings.push(warning),
+  });
 
   assert.deepEqual(folders[0].conversations.map(({ id }) => id), ['valid']);
+  assert.ok(warnings.length >= malformed.length + 1);
+  assert.ok(warnings.every((warning) => !warning.includes('\n')));
 });
 
 void test('projects 1000 sessions and checks each grouped directory only once', async () => {
   const checks = new Map<string, number>();
+  let activeChecks = 0;
+  let maximumActiveChecks = 0;
   const sessions = Array.from({ length: 1_000 }, (_, index) => session(
     `session-${index.toString().padStart(4, '0')}`,
     `C:\\projects\\project-${index % 100}`,
@@ -198,9 +222,13 @@ void test('projects 1000 sessions and checks each grouped directory only once', 
   ));
 
   const folders = await projectSessions(sessions, {
-    isDirectoryAvailable: (path) => {
+    isDirectoryAvailable: async (path) => {
       checks.set(path, (checks.get(path) ?? 0) + 1);
-      return Promise.resolve(true);
+      activeChecks += 1;
+      maximumActiveChecks = Math.max(maximumActiveChecks, activeChecks);
+      await new Promise((resolve) => setImmediate(resolve));
+      activeChecks -= 1;
+      return true;
     },
   });
 
@@ -208,4 +236,5 @@ void test('projects 1000 sessions and checks each grouped directory only once', 
   assert.equal(folders.reduce((total, folder) => total + folder.conversations.length, 0), 1_000);
   assert.equal(checks.size, 100);
   assert.ok([...checks.values()].every((count) => count === 1));
+  assert.ok(maximumActiveChecks <= 16);
 });

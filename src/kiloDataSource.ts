@@ -1,11 +1,14 @@
 import { homedir } from 'node:os';
 import { win32 } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { Worker } from 'node:worker_threads';
 
 import type { RawSessionMetadata } from './types.js';
 
 const MINIMUM_KILO_VERSION = [7, 7, 5] as const;
 const DATABASE_TIMEOUT_MS = 5_000;
+const WORKER_TIMEOUT_MS = 10_000;
+const MAX_WARNING_COUNT = 100;
 
 const METADATA_QUERY = `SELECT
   id,
@@ -20,14 +23,17 @@ WHERE parent_id IS NULL
   AND time_archived IS NULL
 ORDER BY time_updated DESC`;
 
-const REQUIRED_SESSION_COLUMNS = new Map<string, { type: string; notNull: boolean }>([
-  ['id', { type: 'TEXT', notNull: true }],
-  ['title', { type: 'TEXT', notNull: true }],
-  ['directory', { type: 'TEXT', notNull: true }],
-  ['parent_id', { type: 'TEXT', notNull: false }],
-  ['time_created', { type: 'INTEGER', notNull: true }],
-  ['time_updated', { type: 'INTEGER', notNull: true }],
-  ['time_archived', { type: 'INTEGER', notNull: false }],
+const REQUIRED_SESSION_COLUMNS = new Map<string, {
+  type: string;
+  constraint: 'primaryKey' | 'notNull' | 'nullable';
+}>([
+  ['id', { type: 'TEXT', constraint: 'primaryKey' }],
+  ['title', { type: 'TEXT', constraint: 'notNull' }],
+  ['directory', { type: 'TEXT', constraint: 'notNull' }],
+  ['parent_id', { type: 'TEXT', constraint: 'nullable' }],
+  ['time_created', { type: 'INTEGER', constraint: 'notNull' }],
+  ['time_updated', { type: 'INTEGER', constraint: 'notNull' }],
+  ['time_archived', { type: 'INTEGER', constraint: 'nullable' }],
 ]);
 
 export interface KiloDatabaseResolverOptions {
@@ -41,10 +47,24 @@ export interface ReadKiloSessionsOptions extends KiloDatabaseResolverOptions {
   onWarning?: (message: string) => void;
 }
 
+export interface KiloDataWorkerResult {
+  sessions: RawSessionMetadata[];
+  warnings: string[];
+}
+
+export interface KiloDataWorkerResponse {
+  result?: KiloDataWorkerResult;
+  error?: {
+    message: string;
+    stack?: string;
+  };
+}
+
 interface SessionColumnInfo {
   name: string;
   type: string;
   notNull: boolean;
+  primaryKey: boolean;
 }
 
 export class KiloDataSourceError extends Error {
@@ -161,7 +181,13 @@ function readSessionColumns(database: DatabaseSync): SessionColumnInfo[] {
     typeof row.name === 'string'
     && typeof row.type === 'string'
     && (row.notnull === 0 || row.notnull === 1)
-      ? [{ name: row.name, type: row.type.trim().toUpperCase(), notNull: row.notnull === 1 }]
+    && typeof row.pk === 'number'
+      ? [{
+        name: row.name,
+        type: row.type.trim().toUpperCase(),
+        notNull: row.notnull === 1,
+        primaryKey: row.pk > 0,
+      }]
       : []
   ));
 }
@@ -180,7 +206,12 @@ function assertCompatibleSchema(database: DatabaseSync): void {
     if (!actual) {
       throw new KiloDataSourceError(`Несовместимая schema Kilo: отсутствует колонка session.${name}.`);
     }
-    if (actual.type !== expected.type || actual.notNull !== expected.notNull) {
+    const constraintMatches = expected.constraint === 'primaryKey'
+      ? actual.primaryKey
+      : expected.constraint === 'notNull'
+        ? actual.notNull
+        : !actual.notNull && !actual.primaryKey;
+    if (actual.type !== expected.type || !constraintMatches) {
       throw new KiloDataSourceError(`Несовместимая schema Kilo: неверная структура session.${name}.`);
     }
   }
@@ -202,8 +233,12 @@ function validateSessionRow(row: Record<string, unknown>): RawSessionMetadata | 
   if (
     typeof row.id !== 'string'
     || row.id.trim() === ''
+    || row.id.length > 512
     || typeof row.title !== 'string'
+    || row.title.length > 32_768
     || typeof row.directory !== 'string'
+    || row.directory.length === 0
+    || row.directory.length > 32_768
     || timeCreated === undefined
     || timeUpdated === undefined
     || !(row.parent_id === null || typeof row.parent_id === 'string')
@@ -223,8 +258,10 @@ function validateSessionRow(row: Record<string, unknown>): RawSessionMetadata | 
   };
 }
 
-/** Reads only root, non-archived Kilo session metadata. */
-export function readKiloSessions(options: ReadKiloSessionsOptions = {}): RawSessionMetadata[] {
+/** Runs inside the dedicated SQLite worker. */
+export function readKiloSessionsInCurrentThread(
+  options: ReadKiloSessionsOptions = {},
+): KiloDataWorkerResult {
   assertSupportedKiloVersion(options.kiloVersion);
   const databasePath = resolveKiloDatabasePath(options);
 
@@ -232,14 +269,83 @@ export function readKiloSessions(options: ReadKiloSessionsOptions = {}): RawSess
     assertCompatibleSchema(database);
     const rows = database.prepare(METADATA_QUERY).all() as Array<Record<string, unknown>>;
     const sessions: RawSessionMetadata[] = [];
+    const warnings: string[] = [];
     rows.forEach((row, index) => {
       const session = validateSessionRow(row);
       if (session) {
         sessions.push(session);
       } else {
-        options.onWarning?.(`Строка session #${index + 1} пропущена: некорректные metadata-поля.`);
+        if (warnings.length < MAX_WARNING_COUNT) {
+          warnings.push(`Строка session #${index + 1} пропущена: некорректные metadata-поля.`);
+        } else if (warnings.length === MAX_WARNING_COUNT) {
+          warnings.push('Дополнительные предупреждения о повреждённых session подавлены.');
+        }
       }
     });
-    return sessions;
+    return { sessions, warnings };
+  });
+}
+
+/** Reads root, non-archived metadata without blocking the Extension Host event loop. */
+export function readKiloSessions(
+  options: ReadKiloSessionsOptions = {},
+): Promise<RawSessionMetadata[]> {
+  const workerOptions: Omit<ReadKiloSessionsOptions, 'onWarning'> = {
+    env: options.env ?? process.env,
+    homeDirectory: options.homeDirectory,
+    platform: options.platform ?? process.platform,
+    kiloVersion: options.kiloVersion,
+  };
+
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(win32.join(__dirname, 'kiloDataWorker.js'), {
+      workerData: workerOptions,
+      resourceLimits: {
+        maxOldGenerationSizeMb: 64,
+      },
+    });
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      void worker.terminate();
+      reject(new KiloDataSourceError(`SQLite worker превысил лимит ${WORKER_TIMEOUT_MS} ms.`));
+    }, WORKER_TIMEOUT_MS);
+
+    const settle = (action: () => void): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      action();
+    };
+
+    worker.once('message', (response: KiloDataWorkerResponse) => {
+      settle(() => {
+        if (response.error !== undefined) {
+          const error = new KiloDataSourceError(response.error.message);
+          error.stack = response.error.stack ?? error.stack;
+          reject(error);
+          return;
+        }
+        if (response.result === undefined) {
+          reject(new KiloDataSourceError('SQLite worker вернул некорректный ответ.'));
+          return;
+        }
+        response.result.warnings.forEach((warning) => options.onWarning?.(warning));
+        resolve(response.result.sessions);
+      });
+    });
+    worker.once('error', (error) => settle(() => reject(error)));
+    worker.once('exit', (code) => {
+      settle(() => reject(new KiloDataSourceError(
+        code === 0
+          ? 'SQLite worker завершился без ответа.'
+          : `SQLite worker завершился с кодом ${code}.`,
+      )));
+    });
   });
 }

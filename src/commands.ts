@@ -1,4 +1,3 @@
-import { stat } from 'node:fs/promises';
 import { win32 } from 'node:path';
 
 import * as vscode from 'vscode';
@@ -8,6 +7,7 @@ import {
   type KiloFolderTreeProvider,
 } from './folderTreeProvider.js';
 import type { KiloFolder } from './types.js';
+import { isAvailableLocalDirectory } from './windowsPathSafety.js';
 
 export interface CommandRegistrationOptions {
   readonly provider: KiloFolderTreeProvider;
@@ -16,6 +16,13 @@ export interface CommandRegistrationOptions {
 }
 
 type OpenMode = 'here' | 'newWindow' | 'fileExplorer';
+
+export function openFolderOptions(mode: 'here' | 'newWindow'):
+{ forceReuseWindow: true } | { forceNewWindow: true } {
+  return mode === 'here'
+    ? { forceReuseWindow: true }
+    : { forceNewWindow: true };
+}
 
 function technicalError(error: unknown): string {
   if (error instanceof Error) {
@@ -68,9 +75,8 @@ async function openFolder(
   }
 
   try {
-    const status = await stat(uri.fsPath);
-    if (!status.isDirectory()) {
-      options.output.appendLine(`[commands] Путь не является каталогом: ${uri.fsPath}`);
+    if (!await isAvailableLocalDirectory(uri.fsPath, 2_000)) {
+      options.output.appendLine(`[commands] Путь не является доступным локальным каталогом: ${uri.fsPath}`);
       await vscode.window.showErrorMessage(`Папка недоступна: ${uri.fsPath}`);
       return;
     }
@@ -84,10 +90,7 @@ async function openFolder(
       return;
     }
 
-    const openOptions = mode === 'here'
-      ? { forceReuseWindow: true }
-      : { forceNewWindow: true };
-    await vscode.commands.executeCommand('vscode.openFolder', uri, openOptions);
+    await vscode.commands.executeCommand('vscode.openFolder', uri, openFolderOptions(mode));
   } catch (error) {
     options.output.appendLine(`[commands] Ошибка открытия локальной папки ${uri.fsPath}: ${technicalError(error)}`);
     await vscode.window.showErrorMessage(`Папка недоступна: ${uri.fsPath}`);

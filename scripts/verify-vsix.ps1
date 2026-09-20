@@ -1,48 +1,28 @@
 $ErrorActionPreference = 'Stop'
 
-$artifact = Join-Path $PSScriptRoot '..\dist\kilo-hub-0.1.0-win32-x64.vsix'
-$artifact = (Resolve-Path -LiteralPath $artifact).Path
+$repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+$sourceManifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'package.json') -Raw | ConvertFrom-Json
+$artifactName = "$($sourceManifest.name)-$($sourceManifest.version)-win32-x64.vsix"
+$artifact = (Resolve-Path -LiteralPath (Join-Path $repositoryRoot "dist\$artifactName")).Path
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [System.IO.Compression.ZipFile]::OpenRead($artifact)
 
 try {
-    $entries = @($archive.Entries | ForEach-Object { $_.FullName })
-    $required = @(
+    $expectedEntries = @(
         '[Content_Types].xml',
         'extension.vsixmanifest',
-        'extension/package.json',
+        'extension/LICENSE.txt',
         'extension/build/extension.js',
+        'extension/build/kiloDataWorker.js',
+        'extension/docs/release-notes.md',
+        'extension/package.json',
         'extension/resources/hub.svg'
-    )
-
-    foreach ($path in $required) {
-        if ($entries -notcontains $path) {
-            throw "В VSIX отсутствует обязательный файл: $path"
-        }
-    }
-
-    $forbidden = @(
-        '^extension/src/',
-        '^extension/tests/',
-        '^extension/node_modules/',
-        '^extension/req/',
-        '^extension/specs/',
-        '^extension/reviews/',
-        '\.ts$',
-        '\.map$',
-        '\.db$',
-        '-wal$',
-        '-shm$',
-        '/\.env$'
-    )
-
-    foreach ($path in $entries) {
-        foreach ($pattern in $forbidden) {
-            if ($path -match $pattern) {
-                throw "В VSIX найден запрещённый файл: $path"
-            }
-        }
+    ) | Sort-Object
+    $entries = @($archive.Entries | ForEach-Object { $_.FullName } | Sort-Object)
+    $difference = @(Compare-Object -ReferenceObject $expectedEntries -DifferenceObject $entries)
+    if ($difference.Count -ne 0) {
+        throw "VSIX entries do not match the exact allow-list: $($difference | Out-String)"
     }
 
     $manifestEntry = $archive.GetEntry('extension/package.json')
@@ -54,16 +34,75 @@ try {
         $reader.Dispose()
     }
 
+    if ($manifest.name -ne $sourceManifest.name -or
+        $manifest.publisher -ne $sourceManifest.publisher -or
+        $manifest.version -ne $sourceManifest.version) {
+        throw 'Packaged extension identity does not match package.json.'
+    }
     if ($manifest.main -ne './build/extension.js') {
-        throw "Некорректная точка входа VSIX: $($manifest.main)"
+        throw "Unexpected VSIX entry point: $($manifest.main)"
     }
-
     if ($manifest.engines.vscode -ne '^1.105.1') {
-        throw "Некорректный engines.vscode: $($manifest.engines.vscode)"
+        throw "Unexpected engines.vscode: $($manifest.engines.vscode)"
+    }
+    $extensionKinds = @($manifest.extensionKind)
+    if ($extensionKinds.Count -ne 1 -or $extensionKinds[0] -ne 'ui') {
+        throw 'Unexpected extensionKind.'
     }
 
-    $entryList = $entries | Sort-Object
-    $entryList | ForEach-Object { $_ }
+    $expectedActivation = @('onCommand:kiloHub.refresh', 'onView:kiloHub.folders') | Sort-Object
+    if (@(Compare-Object $expectedActivation @($manifest.activationEvents | Sort-Object)).Count -ne 0) {
+        throw 'Unexpected activation events.'
+    }
+    $expectedCommands = @(
+        'kiloHub.openHere',
+        'kiloHub.openInFileExplorer',
+        'kiloHub.openNewWindow',
+        'kiloHub.refresh'
+    ) | Sort-Object
+    $actualCommands = @($manifest.contributes.commands | ForEach-Object { $_.command } | Sort-Object)
+    if (@(Compare-Object $expectedCommands $actualCommands).Count -ne 0) {
+        throw 'Unexpected command contributions.'
+    }
+    $activityContainers = @($manifest.contributes.viewsContainers.activitybar)
+    $folderViews = @($manifest.contributes.views.kiloHub)
+    if ($activityContainers.Count -ne 1 -or
+        $activityContainers[0].id -ne 'kiloHub' -or
+        $folderViews.Count -ne 1 -or
+        $folderViews[0].id -ne 'kiloHub.folders') {
+        throw 'Unexpected view contributions.'
+    }
+
+    $deploymentEntry = $archive.GetEntry('extension.vsixmanifest')
+    $reader = [System.IO.StreamReader]::new($deploymentEntry.Open())
+    try {
+        $deploymentManifest = $reader.ReadToEnd()
+    }
+    finally {
+        $reader.Dispose()
+    }
+    if ($deploymentManifest -notmatch 'TargetPlatform="win32-x64"') {
+        throw 'VSIX target platform is not win32-x64.'
+    }
+
+    foreach ($bundleName in @('extension.js', 'kiloDataWorker.js')) {
+        $bundleEntry = $archive.GetEntry("extension/build/$bundleName")
+        $bundleStream = $bundleEntry.Open()
+        $sha256 = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            $packagedBundleHash = ([BitConverter]::ToString($sha256.ComputeHash($bundleStream))).Replace('-', '')
+        }
+        finally {
+            $sha256.Dispose()
+            $bundleStream.Dispose()
+        }
+        $sourceBundleHash = (Get-FileHash -LiteralPath (Join-Path $repositoryRoot "build\$bundleName") -Algorithm SHA256).Hash
+        if ($packagedBundleHash -ne $sourceBundleHash) {
+            throw "Packaged bundle does not match the fresh build output: $bundleName"
+        }
+    }
+
+    $entries | ForEach-Object { $_ }
 }
 finally {
     $archive.Dispose()
@@ -72,5 +111,5 @@ finally {
 $hash = Get-FileHash -LiteralPath $artifact -Algorithm SHA256
 $size = (Get-Item -LiteralPath $artifact).Length
 "VSIX: $artifact"
-"Размер: $size байт"
+"Size: $size bytes"
 "SHA-256: $($hash.Hash)"

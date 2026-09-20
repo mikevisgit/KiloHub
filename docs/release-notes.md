@@ -28,6 +28,7 @@ Step 1 не поддерживает:
 
 - `.code-workspace` и multi-root workspaces;
 - UNC paths;
+- mapped network drives и reparse points, которые разрешаются в UNC target;
 - Remote SSH, WSL и Dev Container paths/URI;
 - архивные и дочерние agent sessions;
 - автоматическое отслеживание изменений без ручного `Refresh`;
@@ -44,6 +45,6 @@ Step 1 не поддерживает:
 
 Расширение выбирает только ID, title, directory, timestamps и признаки parent/archive. Тела сообщений и содержимое файлов проектов не читаются. Kilo storage открывается read-only; расширение не выполняет migrations, checkpoint, изменение journal mode или записи.
 
-## Статус выпуска
+## Сборка
 
-Документ является release candidate и будет дополнен точным именем VSIX, checksum и результатом smoke test после завершения release gate.
+Версия распространяется как platform-specific пакет `kilo-hub-0.1.0-win32-x64.vsix`. Точный checksum и результаты release gate записываются в корневой `handoff.md`, который не включается в runtime-пакет.

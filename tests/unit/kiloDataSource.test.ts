@@ -8,13 +8,14 @@ import test, { after } from 'node:test';
 import {
   KiloDataSourceError,
   readKiloSessions,
+  readKiloSessionsInCurrentThread,
   resolveKiloDatabasePath,
 } from '../../src/kiloDataSource.js';
 
 const tempDirectories: string[] = [];
 
 const VALID_SCHEMA = `CREATE TABLE session (
-  id TEXT NOT NULL PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   directory TEXT NOT NULL,
   parent_id TEXT,
@@ -41,11 +42,13 @@ function createDatabase(schema = VALID_SCHEMA): string {
 }
 
 function readFixture(databasePath: string, overrides: { kiloVersion?: string; onWarning?: (message: string) => void } = {}) {
-  return readKiloSessions({
+  const result = readKiloSessionsInCurrentThread({
     env: { KILO_DB: databasePath },
     platform: 'win32',
     ...overrides,
   });
+  result.warnings.forEach((warning) => overrides.onWarning?.(warning));
+  return result.sessions;
 }
 
 function snapshotFiles(directory: string): Map<string, Buffer> {
@@ -191,6 +194,11 @@ void test('enforces the seven-column structural schema guard', async (context) =
       expected: /session\.title/,
     },
     {
+      name: 'missing id primary key',
+      schema: VALID_SCHEMA.replace('id TEXT PRIMARY KEY', 'id TEXT NOT NULL'),
+      expected: /session\.id/,
+    },
+    {
       name: 'wrong nullability',
       schema: VALID_SCHEMA.replace('directory TEXT NOT NULL', 'directory TEXT'),
       expected: /session\.directory/,
@@ -267,6 +275,30 @@ void test('bounds SQLITE_BUSY waiting under an exclusive lock', () => {
     const elapsed = performance.now() - startedAt;
     assert.ok(elapsed >= 4_500, `busy timeout завершился слишком рано: ${elapsed} ms`);
     assert.ok(elapsed < 7_500, `busy timeout превысил допустимую границу: ${elapsed} ms`);
+  } finally {
+    writer.exec('ROLLBACK');
+    writer.close();
+  }
+});
+
+void test('keeps the event loop responsive while the SQLite worker is busy', async () => {
+  const databasePath = createDatabase();
+  const writer = new DatabaseSync(databasePath);
+  try {
+    writer.exec('BEGIN EXCLUSIVE');
+    let timerFired = false;
+    const timer = setTimeout(() => {
+      timerFired = true;
+    }, 50);
+    const read = readKiloSessions({
+      env: { KILO_DB: databasePath },
+      platform: 'win32',
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    clearTimeout(timer);
+    assert.equal(timerFired, true);
+    await assert.rejects(read, /busy|locked/i);
   } finally {
     writer.exec('ROLLBACK');
     writer.close();

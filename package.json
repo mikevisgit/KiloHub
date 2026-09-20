@@ -6,8 +6,10 @@
   "publisher": "local",
   "private": true,
   "license": "UNLICENSED",
+  "packageManager": "npm@11.6.2",
   "engines": {
-    "vscode": "^1.105.1"
+    "vscode": "^1.105.1",
+    "node": ">=22.20.0 <25"
   },
   "categories": [
     "Other"
@@ -21,7 +23,8 @@
     "onCommand:kiloHub.refresh"
   ],
   "files": [
-    "build/extension.js",
+    "LICENSE.txt",
+    "build/*.js",
     "docs/release-notes.md",
     "resources/**"
   ],
@@ -95,6 +98,7 @@
     "build:tests": "tsc -p tsconfig.tests.json",
     "test:unit": "npm run build:tests && node scripts/run-unit-tests.mjs",
     "test:integration": "npm run bundle && npm run build:tests && node scripts/run-extension-tests.mjs",
+    "test:installed": "npm run bundle && npm run build:tests && node scripts/run-installed-extension-tests.mjs",
     "test": "npm run check-types && npm run lint && npm run test:unit && npm run test:integration",
     "verify:vsix": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-vsix.ps1",
     "package": "npm run bundle && node scripts/package.mjs && npm run verify:vsix"

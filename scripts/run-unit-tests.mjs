@@ -7,7 +7,7 @@ for await (const file of glob('build-tests/tests/unit/**/*.test.js')) {
 }
 
 if (files.length === 0) {
-  throw new Error('Не найдены скомпилированные unit tests.');
+  throw new Error('No compiled unit tests were found.');
 }
 
 const result = spawnSync(process.execPath, ['--test', ...files.sort()], {

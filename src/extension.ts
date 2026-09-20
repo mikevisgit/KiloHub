@@ -1,11 +1,10 @@
-import { stat } from 'node:fs/promises';
-
 import * as vscode from 'vscode';
 
 import { registerKiloHubCommands } from './commands.js';
 import { KiloFolderTreeProvider } from './folderTreeProvider.js';
 import { readKiloSessions } from './kiloDataSource.js';
 import { projectSessions } from './projection.js';
+import { isAvailableLocalDirectory } from './windowsPathSafety.js';
 
 const VIEW_ID = 'kiloHub.folders';
 const OUTPUT_NAME = 'Kilo Hub';
@@ -33,35 +32,38 @@ function installedKiloVersion(): string | undefined {
   return typeof version === 'string' ? version : undefined;
 }
 
-async function isDirectoryAvailable(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel(OUTPUT_NAME);
   const provider = new KiloFolderTreeProvider();
   const treeView = vscode.window.createTreeView(VIEW_ID, { treeDataProvider: provider });
   let refreshInFlight: Promise<void> | undefined;
   let initialVisibilityHandled = false;
+  let warningCount = 0;
+
+  const logWarning = (source: string, message: string): void => {
+    if (warningCount < 100) {
+      output.appendLine(`[${source}] ${message}`);
+    } else if (warningCount === 100) {
+      output.appendLine('[warning] Дополнительные предупреждения refresh подавлены.');
+    }
+    warningCount += 1;
+  };
 
   const performRefresh = async (): Promise<void> => {
     treeView.message = LOADING_MESSAGE;
     try {
+      warningCount = 0;
       if (process.platform !== 'win32') {
         throw new Error(PLATFORM_ERROR);
       }
 
-      const sessions = readKiloSessions({
+      const sessions = await readKiloSessions({
         kiloVersion: installedKiloVersion(),
-        onWarning: (message) => output.appendLine(`[adapter] ${message}`),
+        onWarning: (message) => logWarning('adapter', message),
       });
       const folders = await projectSessions(sessions, {
-        isDirectoryAvailable,
-        onWarning: (message) => output.appendLine(`[projection] ${message}`),
+        isDirectoryAvailable: (path) => isAvailableLocalDirectory(path),
+        onWarning: (message) => logWarning('projection', message),
       });
 
       provider.setFolders(folders);
@@ -72,6 +74,7 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.window.showErrorMessage(
         process.platform === 'win32' ? ERROR_MESSAGE : PLATFORM_ERROR,
       );
+      throw error;
     }
   };
 
@@ -96,7 +99,7 @@ export function activate(context: vscode.ExtensionContext): void {
       return;
     }
     initialVisibilityHandled = true;
-    void refresh();
+    void refresh().catch(() => undefined);
   };
 
   const visibilitySubscription = treeView.onDidChangeVisibility(({ visible }) => {

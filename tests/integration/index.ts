@@ -13,6 +13,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import * as vscode from 'vscode';
 
+import { openFolderOptions } from '../../src/commands.js';
 import { KiloFolderTreeProvider } from '../../src/folderTreeProvider.js';
 
 const EXTENSION_ID = 'local.kilo-hub';
@@ -156,6 +157,8 @@ export async function run(): Promise<void> {
   }
 
   testTreeProviderContract();
+  assert.deepEqual(openFolderOptions('here'), { forceReuseWindow: true });
+  assert.deepEqual(openFolderOptions('newWindow'), { forceNewWindow: true });
 
   const workspacePath = resolve(__dirname, '..', '..', '..', 'tests', 'fixtures', 'workspace');
   const tempDirectory = mkdtempSync(join(tmpdir(), 'kilo-hub-extension-'));

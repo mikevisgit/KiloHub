@@ -1,0 +1,10 @@
+{
+  "name": "kilo-hub-test-harness",
+  "displayName": "Kilo Hub Test Harness",
+  "version": "0.0.0",
+  "publisher": "local",
+  "private": true,
+  "engines": {
+    "vscode": "^1.105.1"
+  }
+}

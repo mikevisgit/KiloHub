@@ -29,7 +29,7 @@ C:\Users\GRAM\.local\share\kilo\kilo.db-shm
 
 1. Data root берётся из `XDG_DATA_HOME`, иначе используется `%USERPROFILE%\.local\share`.
 2. К data root добавляется каталог `kilo`.
-3. Если задан `KILO_DB`, значение `:memory:` означает in-memory database, абсолютный путь используется напрямую, относительный разрешается внутри каталога `kilo`.
+3. Если задан `KILO_DB`, значение `:memory:` означает in-memory database, абсолютный путь используется напрямую, относительный передаётся `path.resolve` с каталогом `kilo` как base. Как и официальный Kilo 7.7.5, такой override может содержать `..`; `KILO_DB` считается доверенной пользовательской настройкой.
 4. Для release channels `latest`, `beta`, `prod` или при `KILO_DISABLE_CHANNEL_DB=true|1` используется `kilo.db`.
 5. Для другого build-time channel используется `kilo-<channel>.db`; при отсутствии нового файла возможен legacy fallback `opencode-<channel>.db`.
 
@@ -37,7 +37,7 @@ C:\Users\GRAM\.local\share\kilo\kilo.db-shm
 
 Portable mode VS Code сам по себе не переносит Kilo storage. Без явного override используется профиль пользователя Windows.
 
-Production resolver Step 1 поддерживает однозначные runtime-входы текущего локального environment: `KILO_DB`, `XDG_DATA_HOME` и стандартный release path. `:memory:` отклоняется, потому что отдельный Extension Host не может разделить in-memory connection Kilo. Неизвестный channel нельзя угадывать перебором нескольких баз: пользователь должен передать точный `KILO_DB`.
+Production resolver Step 1 поддерживает однозначные runtime-входы текущего локального environment: `KILO_DB`, `XDG_DATA_HOME` и стандартный release path. `:memory:` отклоняется, потому что отдельный Extension Host не может разделить in-memory connection Kilo. Неизвестный channel нельзя угадывать перебором нескольких баз: пользователь должен передать точный `KILO_DB`. Относительный override намеренно повторяет semantics официального `path.resolve`, а не реализует security sandbox; для ограничения каталогом следует использовать корректный путь без `..`.
 
 ## Schema таблицы `session`
 
@@ -45,7 +45,7 @@ Production resolver Step 1 поддерживает однозначные runti
 
 | Колонка | Тип | Nullable | Назначение |
 |---|---|---|---|
-| `id` | `TEXT` | нет | ID диалога |
+| `id` | `TEXT` | primary key (`PRAGMA table_info.notnull=0`, `pk=1`) | ID диалога |
 | `directory` | `TEXT` | нет | связь с локальной папкой |
 | `title` | `TEXT` | нет | сохранённое название |
 | `parent_id` | `TEXT` | да | исключение дочерних sessions |
@@ -91,7 +91,7 @@ Guard выполняется до metadata-запроса:
 
 1. Если установлен `kilocode.kilo-code`, версия ниже `7.7.5` отклоняется.
 2. Проверяется, что `session` является таблицей.
-3. Через `PRAGMA table_info(session)` проверяются обязательные колонки, их типы и `NOT NULL` для `id`, `directory`, `title`, `time_created`, `time_updated`.
+3. Через `PRAGMA table_info(session)` проверяются обязательные колонки и типы. Для `id` требуется `pk>0`: SQLite сообщает `notnull=0` для фактического `TEXT PRIMARY KEY`. Для `directory`, `title`, `time_created`, `time_updated` требуется `NOT NULL`; parent/archive остаются nullable.
 4. Дополнительные колонки разрешены для forward compatibility.
 5. Подготавливается точный metadata-only `SELECT`; ошибка подготовки означает несовместимую schema.
 6. Migration IDs допустимы только как диагностический fingerprint, но не как единственный guard.
@@ -128,11 +128,11 @@ CLI не используется в runtime. Его общий startup выпо
 Каждый refresh:
 
 1. заново определяет путь;
-2. открывает короткоживущую read-only connection;
+2. создаёт короткоживущий worker thread и в нём открывает read-only connection;
 3. включает connection-local `PRAGMA query_only = ON`;
 4. проверяет schema;
 5. полностью материализует один metadata result set;
-6. закрывает connection в `finally`;
+6. закрывает connection в `finally`, возвращает только metadata и завершает worker;
 7. нормализует и группирует данные вне SQLite;
 8. атомарно заменяет in-memory UI model.
 

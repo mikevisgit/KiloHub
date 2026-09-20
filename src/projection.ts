@@ -19,7 +19,7 @@ interface CandidateConversation {
 }
 
 interface FolderGroup {
-  directory: NormalizedWindowsDirectory;
+  displayCandidate: CandidateConversation;
   conversations: KiloConversation[];
 }
 
@@ -179,6 +179,19 @@ function compareConversations(left: KiloConversation, right: KiloConversation): 
     || compareText(left.id, right.id);
 }
 
+function diagnosticSessionId(value: unknown): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    return '<unknown>';
+  }
+  return [...value]
+    .map((character) => {
+      const code = character.charCodeAt(0);
+      return code <= 31 || code === 127 ? '?' : character;
+    })
+    .join('')
+    .slice(0, 128);
+}
+
 function preferredDuplicate(
   left: CandidateConversation,
   right: CandidateConversation,
@@ -189,7 +202,19 @@ function preferredDuplicate(
   return comparison <= 0 ? left : right;
 }
 
-function toCandidate(session: RawSessionMetadata): CandidateConversation | undefined {
+function compareDisplayCandidates(
+  left: CandidateConversation,
+  right: CandidateConversation,
+): number {
+  return compareOptionalTimestampDescending(left.updatedAt, right.updatedAt)
+    || compareText(left.session.id, right.session.id)
+    || compareText(left.directory.path, right.directory.path);
+}
+
+function toCandidate(
+  session: RawSessionMetadata,
+  onWarning: ProjectionOptions['onWarning'],
+): CandidateConversation | undefined {
   if (
     session.parentId !== null
     || session.timeArchived !== null
@@ -198,11 +223,13 @@ function toCandidate(session: RawSessionMetadata): CandidateConversation | undef
     || typeof session.directory !== 'string'
     || (session.title !== null && typeof session.title !== 'string')
   ) {
+    onWarning?.(`Session "${diagnosticSessionId(session.id)}" пропущена: некорректные metadata-поля.`);
     return undefined;
   }
 
   const directory = normalizeWindowsDirectory(session.directory);
   if (!directory) {
+    onWarning?.(`Session "${diagnosticSessionId(session.id)}" пропущена: directory не поддерживается.`);
     return undefined;
   }
 
@@ -226,7 +253,7 @@ export async function projectSessions(
   const ambiguousSessionIds = new Set<string>();
 
   for (const session of sessions) {
-    const candidate = toCandidate(session);
+    const candidate = toCandidate(session, options.onWarning);
     if (!candidate || ambiguousSessionIds.has(candidate.session.id)) {
       continue;
     }
@@ -238,7 +265,7 @@ export async function projectSessions(
       bySessionId.delete(candidate.session.id);
       ambiguousSessionIds.add(candidate.session.id);
       options.onWarning?.(
-        `Session "${candidate.session.id}" имеет конфликтующие directory; запись пропущена.`,
+        `Session "${diagnosticSessionId(candidate.session.id)}" имеет конфликтующие directory; запись пропущена.`,
       );
     } else {
       bySessionId.set(
@@ -252,14 +279,16 @@ export async function projectSessions(
   for (const candidate of bySessionId.values()) {
     if (candidate.titleWasEmpty) {
       options.onWarning?.(
-        `Session "${candidate.session.id}" имеет пустой title; используется "${UNTITLED}".`,
+        `Session "${diagnosticSessionId(candidate.session.id)}" имеет пустой title; используется "${UNTITLED}".`,
       );
     }
 
     let group = groups.get(candidate.directory.key);
     if (!group) {
-      group = { directory: candidate.directory, conversations: [] };
+      group = { displayCandidate: candidate, conversations: [] };
       groups.set(candidate.directory.key, group);
+    } else if (compareDisplayCandidates(candidate, group.displayCandidate) < 0) {
+      group.displayCandidate = candidate;
     }
     group.conversations.push({
       id: candidate.session.id,
@@ -268,29 +297,42 @@ export async function projectSessions(
     });
   }
 
-  const folders = await Promise.all([...groups.values()].map(async (group) => {
-    group.conversations.sort(compareConversations);
+  const groupList = [...groups.values()];
+  const folders = new Array<KiloFolder>(groupList.length);
+  let nextGroupIndex = 0;
 
-    let available: boolean;
-    try {
-      available = await options.isDirectoryAvailable(group.directory.path);
-    } catch {
-      available = false;
+  const projectNextGroup = async (): Promise<void> => {
+    while (nextGroupIndex < groupList.length) {
+      const index = nextGroupIndex;
+      nextGroupIndex += 1;
+      const group = groupList[index];
+      group.conversations.sort(compareConversations);
+      const directory = group.displayCandidate.directory;
+
+      let available: boolean;
+      try {
+        available = await options.isDirectoryAvailable(directory.path);
+      } catch {
+        available = false;
+      }
+
+      const lastKiloActivityAt = group.conversations.find(
+        (conversation) => conversation.updatedAt !== undefined,
+      )?.updatedAt;
+
+      folders[index] = {
+        id: directory.key,
+        uri: directory.uri,
+        name: directory.name,
+        available,
+        ...(lastKiloActivityAt === undefined ? {} : { lastKiloActivityAt }),
+        conversations: group.conversations,
+      } satisfies KiloFolder;
     }
+  };
 
-    const lastKiloActivityAt = group.conversations.find(
-      (conversation) => conversation.updatedAt !== undefined,
-    )?.updatedAt;
-
-    return {
-      id: group.directory.key,
-      uri: group.directory.uri,
-      name: group.directory.name,
-      available,
-      ...(lastKiloActivityAt === undefined ? {} : { lastKiloActivityAt }),
-      conversations: group.conversations,
-    } satisfies KiloFolder;
-  }));
+  const availabilityWorkers = Math.min(16, groupList.length);
+  await Promise.all(Array.from({ length: availabilityWorkers }, projectNextGroup));
 
   folders.sort((left, right) => (
     compareOptionalTimestampDescending(left.lastKiloActivityAt, right.lastKiloActivityAt)

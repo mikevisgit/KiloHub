@@ -7,7 +7,7 @@
 ## Решение
 
 - Runtime SQLite: `node:sqlite`, класс `DatabaseSync`.
-- Открытие: `{ readOnly: true, timeout: 500, allowExtension: false }`.
+- Открытие в отдельном worker thread: `{ readOnly: true, timeout: 5000, allowExtension: false }`.
 - Минимальная кандидатная версия VS Code: `1.105.1`.
 - Extension Host этой версии: Electron `37.6.0`, Node.js `22.19.0`.
 - Production bundle: CommonJS, target `node22`, модули `vscode` и `node:sqlite` остаются external.
@@ -16,7 +16,7 @@
 
 ## Причины
 
-`node:sqlite` уменьшает поставляемую поверхность: VSIX не содержит `.node`-бинарники, WASM, loader сторонней базы, компилятор или postinstall. Архитектурную совместимость обеспечивает сам локальный VS Code. Read-only задаётся SQLite при открытии connection, а `timeout` ограничивает ожидание busy lock.
+`node:sqlite` уменьшает поставляемую поверхность: VSIX не содержит `.node`-бинарники, WASM, loader сторонней базы, компилятор или postinstall. Архитектурную совместимость обеспечивает сам локальный VS Code. Read-only задаётся SQLite при открытии connection, а `timeout` ограничивает ожидание busy lock. Синхронная connection живёт только в отдельном `worker_threads` worker, поэтому busy timeout не блокирует event loop Extension Host.
 
 Обычное открытие файла видит `kilo.db-wal` и `kilo.db-shm`. SQLite URI option `immutable=1` не используется: для живой WAL-базы он может привести к игнорированию актуальных изменений.
 
@@ -41,6 +41,7 @@
 6. Busy handling ограничен по времени и не зависает.
 7. Connection закрывается в `finally` при успехе и ошибке.
 8. Такой же runtime загружается из установленного VSIX.
+9. Таймер Extension Host продолжает выполняться, пока worker ожидает `SQLITE_BUSY`.
 
 ## Packaging
 
@@ -58,5 +59,5 @@ npm exec -- vsce package --target win32-x64 --no-dependencies --out "dist/kilo-h
 ## Остаточные риски
 
 - В Node 22 API `node:sqlite` имеет статус active development, поэтому Extension Host test обязателен.
-- `DatabaseSync` синхронный. Metadata-only запрос мал, но производительность проверяется на 1 000 sessions до приёмки.
+- `DatabaseSync` синхронный внутри короткоживущего worker; создание worker и производительность проверяются до приёмки.
 - Совместимость `1.105.1` пока является кандидатной и не отмечается пройденной до фактического запуска downloaded test host.

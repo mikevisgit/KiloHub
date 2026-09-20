@@ -29,7 +29,7 @@
 - [ ] Выбран и доказан SQLite runtime внутри упакованного расширения: `node:sqlite` и production bundle доказаны в Extension Host `1.105.1`; установленный VSIX proof ещё не выполнен.
 - [x] Реализованы metadata adapter и domain projection.
 - [x] Реализованы Activity Bar view и команды.
-- [ ] Завершены автоматические тесты и независимое ревью.
+- [ ] Завершены автоматические тесты и независимое ревью: три review и code remediation завершены, release-blocker ожидает новый packaged smoke.
 - [ ] VSIX собран, проверен, установлен и прошёл smoke test.
 - [ ] Здесь опубликованы точный путь и checksum итогового артефакта.
 
@@ -41,9 +41,11 @@
 - `npm run test:unit` прошёл для domain projection: 9/9 tests, включая 1 000 sessions в 100 folders.
 - `npm run check-types` и `npm run lint` проходят после интеграции projection.
 - Изолированный adapter suite прошёл 13/13 top-level/subtests: resolver, schema/version guard, row isolation, read-only/query-only, WAL visibility, busy timeout и освобождение файла.
-- Финальный до packaging прогон `npm test` прошёл: typecheck, ESLint, 22 unit tests и Extension Host test на VS Code `1.105.1`.
+- Прогон до независимого review прошёл: typecheck, ESLint, 22 unit tests и Extension Host test на VS Code `1.105.1`.
 - Extension Host подтвердил Node `22.19.0`, Electron `37.6.0`, загрузку `node:sqlite`, четыре command IDs, view contract, tree contract и неизменность fixture DB.
 - Exclusive-lock тест подтвердил bounded `SQLITE_BUSY` примерно за 7 секунд при настроенном SQLite timeout `5000 ms`.
+- После security review SQLite перенесён в отдельный worker thread с outer timeout `10000 ms` и heap limit `64 MB`; timer test доказывает, что busy wait не блокирует Extension Host event loop.
+- Текущий remediation suite проходит: 27 unit/subtests, включая реальную primary-key semantics, deterministic canonical path, warning sanitization, availability concurrency `<=16` и resolved local path checks.
 
 ## Решения
 
@@ -60,6 +62,7 @@
 - Активная база найдена в `%USERPROFILE%\.local\share\kilo\kilo.db`; SQL и CLI oracle совпали по всем 31 root/non-archived sessions.
 - Timestamps `session.time_created` и `session.time_updated` являются Unix milliseconds; schema guard проверяет семь обязательных колонок и разрешает дополнительные.
 - Manifest использует положительный allow-list `files`; `.vscodeignore` не создаётся. Packaging автоматически фиксирует ZIP timestamp по последнему Git commit и проверяет запрещённые entries.
+- Build environment закреплён как Node `22.20.0` и npm `11.6.2`; локальная проверка выполняется на совместимом Node `24.13.0` с lockfile v3.
 
 ## Активные риски
 
@@ -69,6 +72,8 @@
 - Полная UI-проверка может заменить текущий workspace, поэтому установка и действия проверяются в изолированном профиле и окне.
 - Версию создателя общей базы нельзя без доказательств выводить из версии установленного VS Code extension; compatibility должен определяться подтверждённой schema signature либо metadata самой базы.
 - Read-only WAL reader может обновлять технические read-marks в существующем `kilo.db-shm`. Проверки доказывают неизменность `kilo.db`, WAL и logical sessions; byte identity SHM не заявляется как свойство SQLite.
+- Проверка `realpath` блокирует существующие mapped/reparse paths, разрешающиеся в UNC, но сама первичная Windows resolution может кратковременно обратиться к network provider; операция ограничена timeout и concurrency.
+- Live probe выявил и исправил несовпадение SQLite `notnull` для `TEXT PRIMARY KEY`: production guard теперь проверяет `pk=1`; рабочая Kilo DB успешно возвращает 31 root session через worker.
 
 ## Следующее действие
 
