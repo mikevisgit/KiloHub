@@ -23,7 +23,11 @@ const SQL_VALID_METADATA = `
   AND typeof(title) = 'text'
   AND length(title) <= ${KILO_METADATA_LIMITS.textLength}
   AND typeof(directory) = 'text'
-  AND length(directory) BETWEEN 1 AND ${KILO_METADATA_LIMITS.textLength}`;
+  AND length(directory) BETWEEN 1 AND ${KILO_METADATA_LIMITS.textLength}
+  AND typeof(time_created) = 'integer'
+  AND time_created BETWEEN 0 AND ${Number.MAX_SAFE_INTEGER}
+  AND typeof(time_updated) = 'integer'
+  AND time_updated BETWEEN 0 AND ${Number.MAX_SAFE_INTEGER}`;
 
 export const KILO_METADATA_QUERY = `SELECT
   id,
@@ -39,11 +43,12 @@ WHERE parent_id IS NULL
   AND ${SQL_VALID_METADATA}
 LIMIT ${KILO_METADATA_LIMITS.rows + 1}`;
 
-const INVALID_METADATA_COUNT_QUERY = `SELECT count(*) AS count
+const INVALID_METADATA_COUNT_QUERY = `SELECT 1 AS invalid
 FROM session
 WHERE parent_id IS NULL
   AND time_archived IS NULL
-  AND NOT (${SQL_VALID_METADATA})`;
+  AND NOT (${SQL_VALID_METADATA})
+LIMIT ${MAX_WARNING_COUNT + 1}`;
 
 const REQUIRED_SESSION_COLUMNS = new Map<string, {
   type: string;
@@ -300,12 +305,11 @@ export function readKiloSessionsInCurrentThread(
     assertCompatibleSchema(database);
     const sessions: RawSessionMetadata[] = [];
     const warnings: string[] = [];
-    const invalidCountRow = database.prepare(INVALID_METADATA_COUNT_QUERY).get() as Record<string, unknown>;
-    const invalidCount = typeof invalidCountRow.count === 'number'
-      && Number.isSafeInteger(invalidCountRow.count)
-      && invalidCountRow.count > 0
-      ? invalidCountRow.count
-      : 0;
+    let invalidCount = 0;
+    for (const _row of database.prepare(INVALID_METADATA_COUNT_QUERY).iterate()) {
+      void _row;
+      invalidCount += 1;
+    }
     const fieldWarningCount = Math.min(invalidCount, MAX_WARNING_COUNT);
     for (let index = 0; index < fieldWarningCount; index += 1) {
       warnings.push(`Строка session #${index + 1} пропущена: некорректные metadata-поля.`);

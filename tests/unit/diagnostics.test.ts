@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { sanitizeDiagnostic } from '../../src/diagnostics.js';
+import { formatDiagnosticWarning, sanitizeDiagnostic } from '../../src/diagnostics.js';
 
 void test('redacts Windows, UNC and file URI paths from diagnostic stacks', () => {
   const error = new Error('failed C:\\Users\\Alice Smith\\project\\kilo.db');
@@ -19,4 +19,14 @@ void test('bounds diagnostics and removes control characters without removing li
   assert.equal(sanitized.includes('\u0000'), false);
   assert.equal(sanitized.includes('\n'), true);
   assert.equal(sanitized.length, 4_000);
+});
+
+void test('sanitizes path-shaped session IDs at the warning Output boundary', () => {
+  const warning = formatDiagnosticWarning(
+    'projection',
+    'Session "C:\\Users\\Alice\\secret" пропущена: directory не поддерживается.',
+  );
+  assert.equal(warning.startsWith('[projection] '), true);
+  assert.doesNotMatch(warning, /Alice|secret/u);
+  assert.match(warning, /<local-path>/u);
 });

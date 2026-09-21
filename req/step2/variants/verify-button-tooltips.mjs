@@ -46,6 +46,6 @@ const css=fs.readFileSync(new URL('refinements.css',import.meta.url),'utf8');
 assert(css.includes('max-width:min(330px,calc(100vw - 16px))'));assert(css.includes('max-height:calc(100vh - 16px)'));assert(css.includes('pointer-events:auto'));assert(css.includes('overflow:auto'));
 const html=fs.readFileSync(new URL('01-monograms.html',import.meta.url),'utf8');
 assert.equal((html.match(/<div class="tooltip" role="tooltip" hidden><\/div>/g)||[]).length,4,'popup has no interactive children');
-for(const match of html.matchAll(/<p class="dialogue"([^>]*)>([^<]+)<\/p>/g)){assert(!/tabindex|data-tip/.test(match[1]));assert.equal(match[1],` aria-label="${match[2]}"`);}
+for(const match of html.matchAll(/<p class="dialogue"([^>]*)>([^<]+)<\/p>/g)){assert(!/tabindex/.test(match[1]));assert.equal(match[1],` data-tip="${match[2]}"`);}
 
 console.log('PASS accessible tooltips: immediate pointer/focus, popup hover, crossing grace, Escape lifecycle, stable ARIA, viewport fit/above fallback, bounded long text, passive dialogue names. No browser rendering asserted.');

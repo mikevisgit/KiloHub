@@ -17,3 +17,8 @@ export function sanitizeDiagnostic(error: unknown): string {
       : character;
   }).join('').slice(0, 4_000);
 }
+
+export function formatDiagnosticWarning(source: string, message: string): string {
+  const safeSource = source.replace(/[^a-zA-Z0-9_-]/gu, '?').slice(0, 32);
+  return `[${safeSource}] ${sanitizeDiagnostic(message)}`;
+}

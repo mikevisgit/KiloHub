@@ -5,7 +5,7 @@ import {
   registerKiloHubCommands,
 } from './commands.js';
 import type { WorkspaceDescriptor } from './currentFolder.js';
-import { sanitizeDiagnostic } from './diagnostics.js';
+import { formatDiagnosticWarning, sanitizeDiagnostic } from './diagnostics.js';
 import {
   KILO_HUB_VIEW_ID,
   KiloHubWebviewProvider,
@@ -50,7 +50,7 @@ export function activate(context: vscode.ExtensionContext): void {
   let warningCount = 0;
   const logWarning = (source: string, message: string): void => {
     if (warningCount < 100) {
-      output.appendLine(`[${source}] ${message}`);
+      output.appendLine(formatDiagnosticWarning(source, message));
     } else if (warningCount === 100) {
       output.appendLine('[warning] Дополнительные предупреждения refresh подавлены.');
     }

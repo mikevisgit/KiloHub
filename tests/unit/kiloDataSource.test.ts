@@ -203,6 +203,15 @@ void test('accepts exact field bounds and isolates rows over id, title or path l
     insert.run('i'.repeat(KILO_METADATA_LIMITS.idLength + 1), 'title', 'C:\\id', 3_000);
     insert.run('title-over', 't'.repeat(KILO_METADATA_LIMITS.textLength + 1), 'C:\\title', 2_000);
     insert.run('path-over', 'title', 'D:\\'.padEnd(KILO_METADATA_LIMITS.textLength + 1, 'p'), 1_000);
+    database.prepare(`INSERT INTO session (
+      id, title, directory, parent_id, time_created, time_updated, time_archived
+    ) VALUES (?, ?, ?, NULL, ?, ?, NULL)`).run(
+      'timestamp-blob',
+      'title',
+      'C:\\time',
+      new Uint8Array(1024 * 1024),
+      5_000,
+    );
   } finally {
     database.close();
   }
@@ -214,7 +223,7 @@ void test('accepts exact field bounds and isolates rows over id, title or path l
   assert.equal(sessions[0]?.id.length, KILO_METADATA_LIMITS.idLength);
   assert.equal(sessions[0]?.title?.length, KILO_METADATA_LIMITS.textLength);
   assert.equal(sessions[0]?.directory?.length, KILO_METADATA_LIMITS.textLength);
-  assert.equal(warnings.length, 3);
+  assert.equal(warnings.length, 4);
 });
 
 void test('accepts exact row and total text budgets and rejects the first excess row', () => {
@@ -269,6 +278,8 @@ void test('bounds rows in SQL without materializing a full ORDER BY sort', () =>
     assert.doesNotMatch(details, /TEMP B-TREE|ORDER BY/i);
     assert.match(KILO_METADATA_QUERY, /LIMIT 10001/u);
     assert.match(KILO_METADATA_QUERY, /length\(title\) <= 4096/u);
+    assert.match(KILO_METADATA_QUERY, /typeof\(time_created\) = 'integer'/u);
+    assert.match(KILO_METADATA_QUERY, /typeof\(time_updated\) = 'integer'/u);
   } finally {
     database.close();
   }

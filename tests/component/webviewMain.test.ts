@@ -378,6 +378,7 @@ void test('uses text-only DOM and exposes full passive conversation text once to
     assert.ok(element);
     assert.equal(element.querySelector('img, script'), null);
     assert.equal(element.querySelector('.folder-name')?.textContent, hostileName);
+    assert.equal(element.querySelector('.mono')?.getAttribute('aria-hidden'), 'true');
     const headerLabel = element.querySelector('.folder-head')?.getAttribute('aria-label') ?? '';
     assert.doesNotMatch(headerLabel, /Путь:/u);
     assert.doesNotMatch(headerLabel, /C:\\<script>bad\(\)<\/script>/u);

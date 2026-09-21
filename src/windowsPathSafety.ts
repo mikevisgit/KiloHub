@@ -1,6 +1,16 @@
 import { realpath, stat } from 'node:fs/promises';
 import { win32 } from 'node:path';
 
+export interface PathProbeOperations {
+  readonly realpath: (path: string) => Promise<string>;
+  readonly stat: (path: string) => Promise<{ isDirectory(): boolean }>;
+}
+
+const DEFAULT_PATH_PROBE_OPERATIONS: PathProbeOperations = {
+  realpath,
+  stat,
+};
+
 const MAX_PENDING_LOCAL_PROBES = 16;
 let activeLocalProbes = 0;
 const probeWaiters: Array<() => void> = [];
@@ -43,16 +53,17 @@ function canonicalLocalWindowsPath(value: string): string | undefined {
 export async function resolveAvailableLocalDirectory(
   path: string,
   timeoutMs = 500,
+  operations: PathProbeOperations = DEFAULT_PATH_PROBE_OPERATIONS,
 ): Promise<string | undefined> {
   const releasePermit = await acquireProbePermit();
   let timeout: NodeJS.Timeout | undefined;
   let timedOut = false;
-  const operation = realpath(path).then(async (resolved) => {
+  const operation = operations.realpath(path).then(async (resolved) => {
     const canonical = canonicalLocalWindowsPath(resolved);
     if (canonical === undefined) {
       return undefined;
     }
-    const status = await stat(canonical);
+    const status = await operations.stat(canonical);
     return status.isDirectory() ? canonical : undefined;
   }, () => undefined);
   try {
@@ -72,7 +83,7 @@ export async function resolveAvailableLocalDirectory(
       clearTimeout(timeout);
     }
     if (timedOut) {
-      void operation.finally(releasePermit);
+      void operation.then(releasePermit, releasePermit);
     } else {
       releasePermit();
     }

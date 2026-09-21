@@ -73,3 +73,17 @@ Testability re-review оставил browser-ready High, три Medium и ожи
 - каждая строка Step 2 matrix связана с точным test file/name и manual ID; checklist дополнен security/scope cases.
 
 Automated evidence после второго набора: `60/60` unit, `29/29` component, full `npm test`, VS Code `1.105.1` и `1.138.0` exit `0`, audit `0 vulnerabilities`, browser scan pass. Source targeted re-review повторяется на новом commit; package Blocker закрывается только фактическим release gate.
+
+### Третье source-закрытие после targeted re-review
+
+Второй targeted pass подтвердил предыдущие fixes и выявил остаточные случаи внутри существующих findings. Они устранены:
+
+- SQL bounds теперь включают `typeof/range` для обоих timestamps, поэтому BLOB/TEXT timestamp не materialize в Node; invalid-row warning probe ограничен `LIMIT 101`;
+- поздний resolve/reject path probe освобождает semaphore через symmetric handled `then`, а deterministic test доказывает максимум 16 physical pending probes и отсутствие unhandled rejection;
+- warning Output boundary применяет sanitizer к path-shaped session IDs;
+- public Refresh fail-closed требует resolved view и browser `ready` до DB read;
+- два full clean release cycles, exact Node engine mutation и requirement traceability формализованы executable scripts/matrix;
+- production/size/reference/test matrix используют `History h2`; пассивные dialogue rows не получают Tab-stop, но сохраняют hover tooltip;
+- traceability manual IDs сверены с реально объявленными checklist IDs, missing security/scope cases добавлены.
+
+Automated evidence: `62/62` unit, `29/29` component, full `npm test`, все шесть design-reference verify, minimum VS Code `1.105.1` и Current `1.138.0` exit `0`. Source review exit повторно проверяется на следующем commit; package Blocker остаётся единственным ожидаемым gate.
