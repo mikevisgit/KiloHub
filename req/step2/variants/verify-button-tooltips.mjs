@@ -42,8 +42,8 @@ const narrow=harness({width:100,height:80}),narrowOwner=narrow.make('narrow',{le
 
 const second=installTooltip(h.panel,h.env);assert.equal(second.tip,tip);assert.equal(tip.id,stableId,'repeat install preserves stable tooltip ID');
 
-const css=fs.readFileSync(new URL('refinements.css',import.meta.url),'utf8');
-assert(css.includes('max-width:min(330px,calc(100vw - 16px))'));assert(css.includes('max-height:calc(100vh - 16px)'));assert(css.includes('pointer-events:auto'));assert(css.includes('overflow:auto'));
+const css=fs.readFileSync(new URL('refinements.css',import.meta.url),'utf8'),compactCss=css.replace(/\s+/g,'');
+assert(compactCss.includes('max-width:min(330px,calc(100vw-16px))'));assert(compactCss.includes('max-height:calc(100vh-16px)'));assert(compactCss.includes('pointer-events:auto'));assert(compactCss.includes('overflow:auto'));
 const html=fs.readFileSync(new URL('01-monograms.html',import.meta.url),'utf8');
 assert.equal((html.match(/<div class="tooltip" role="tooltip" hidden><\/div>/g)||[]).length,4,'popup has no interactive children');
 for(const match of html.matchAll(/<p class="dialogue"([^>]*)>([^<]+)<\/p>/g)){assert(!/tabindex/.test(match[1]));assert.equal(match[1],` data-tip="${match[2]}"`);}

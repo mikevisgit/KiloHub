@@ -4,7 +4,7 @@ assert.deepEqual([...C.slotOrder].sort((a,b)=>a-b),Array.from({length:16},(_,i)=
 for(let i=1;i<16;i++){const d=Math.abs(C.hues[C.slotOrder[i]]-C.hues[C.slotOrder[i-1]]);assert(Math.min(d,360-d)>=60,'demo neighbours use separated hue families');}
 assert.equal(C.hues.length,16);assert.equal(C.lightFills.length,16);
 for(const color of ['#d3e9d9','#f4deca','#e5ddf5','#d5e7ed'])assert(C.lightFills.includes(color));
-const css=fs.readFileSync(new URL('scale.css',import.meta.url),'utf8');assert(css.includes('var(--folder-border,transparent)'));assert(!css.includes(':not(.demo-original)'));assert.equal(new Set(C.hues).size,16);
+const css=fs.readFileSync(new URL('scale.css',import.meta.url),'utf8'),compactCss=css.replace(/\s+/g,'');assert(compactCss.includes('var(--folder-border,transparent)'));assert(!compactCss.includes(':not(.demo-original)'));assert.equal(new Set(C.hues).size,16);
 for(const p of ['D:/Примеры/Папка/','d:\\ПРИМЕРЫ\\папка','D:\\Примеры\\.\\Папка','D:\\Примеры\\другая\\..\\Папка'])assert.equal(C.group(p),C.group('D:\\Примеры\\Папка'));
 for(const p of ['',null,'relative','D:relative','D:\\..\\x','\\\\server\\share','D:\\bad?','D:\\folder.'])assert.equal(C.group(p),null);
 let minText=99,minBorder=99;

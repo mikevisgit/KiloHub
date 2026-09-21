@@ -17,38 +17,20 @@ export const KILO_METADATA_LIMITS = Object.freeze({
   characters: 4 * 1_024 * 1_024,
 });
 
-const SQL_VALID_METADATA = `
-  typeof(id) = 'text'
-  AND length(trim(id)) BETWEEN 1 AND ${KILO_METADATA_LIMITS.idLength}
-  AND typeof(title) = 'text'
-  AND length(title) <= ${KILO_METADATA_LIMITS.textLength}
-  AND typeof(directory) = 'text'
-  AND length(directory) BETWEEN 1 AND ${KILO_METADATA_LIMITS.textLength}
-  AND typeof(time_created) = 'integer'
-  AND time_created BETWEEN 0 AND ${Number.MAX_SAFE_INTEGER}
-  AND typeof(time_updated) = 'integer'
-  AND time_updated BETWEEN 0 AND ${Number.MAX_SAFE_INTEGER}`;
-
 export const KILO_METADATA_QUERY = `SELECT
-  id,
-  title,
-  directory,
-  time_created,
-  time_updated,
-  parent_id,
-  time_archived
+  CASE WHEN typeof(id) = 'text' THEN substr(id, 1, ${KILO_METADATA_LIMITS.idLength + 1}) END AS id,
+  CASE WHEN typeof(title) = 'text' THEN substr(title, 1, ${KILO_METADATA_LIMITS.textLength + 1}) END AS title,
+  CASE WHEN typeof(directory) = 'text' THEN substr(directory, 1, ${KILO_METADATA_LIMITS.textLength + 1}) END AS directory,
+  CASE WHEN typeof(time_created) = 'integer'
+    AND time_created BETWEEN 0 AND ${Number.MAX_SAFE_INTEGER} THEN time_created END AS time_created,
+  CASE WHEN typeof(time_updated) = 'integer'
+    AND time_updated BETWEEN 0 AND ${Number.MAX_SAFE_INTEGER} THEN time_updated END AS time_updated,
+  NULL AS parent_id,
+  NULL AS time_archived
 FROM session
 WHERE parent_id IS NULL
   AND time_archived IS NULL
-  AND ${SQL_VALID_METADATA}
 LIMIT ${KILO_METADATA_LIMITS.rows + 1}`;
-
-const INVALID_METADATA_COUNT_QUERY = `SELECT 1 AS invalid
-FROM session
-WHERE parent_id IS NULL
-  AND time_archived IS NULL
-  AND NOT (${SQL_VALID_METADATA})
-LIMIT ${MAX_WARNING_COUNT + 1}`;
 
 const REQUIRED_SESSION_COLUMNS = new Map<string, {
   type: string;
@@ -305,18 +287,6 @@ export function readKiloSessionsInCurrentThread(
     assertCompatibleSchema(database);
     const sessions: RawSessionMetadata[] = [];
     const warnings: string[] = [];
-    let invalidCount = 0;
-    for (const _row of database.prepare(INVALID_METADATA_COUNT_QUERY).iterate()) {
-      void _row;
-      invalidCount += 1;
-    }
-    const fieldWarningCount = Math.min(invalidCount, MAX_WARNING_COUNT);
-    for (let index = 0; index < fieldWarningCount; index += 1) {
-      warnings.push(`Строка session #${index + 1} пропущена: некорректные metadata-поля.`);
-    }
-    if (invalidCount > MAX_WARNING_COUNT) {
-      warnings.push('Дополнительные предупреждения о повреждённых session подавлены.');
-    }
     let rowCount = 0;
     let characterCount = 0;
     const rows = database.prepare(KILO_METADATA_QUERY).iterate() as Iterable<Record<string, unknown>>;

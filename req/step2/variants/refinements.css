@@ -1,4 +1,231 @@
-.panel{height:790px;min-height:0;overflow:auto;overflow-anchor:none;scrollbar-gutter:stable}.intro{display:flex;align-items:center;gap:6px}.info{background:transparent;color:inherit;border:1px solid transparent;min-width:28px;min-height:28px}.refresh{min-width:28px;min-height:28px}.panel .intro h2{}.folder-head{border-radius:inherit}.folder-head:hover{cursor:pointer}.folder-head[aria-expanded=true] .chevron{transform:rotate(180deg)}.activity{display:block;color:var(--hub-muted);margin-top:4px}.current-label{}.missing-label{}.detail-wrap{height:0;overflow:hidden}.detail-wrap.open{height:auto}.detail{padding-top:4px!important}.actions button{}.actions button[aria-disabled=true]{color:var(--vscode-disabledForeground,#949494);background:var(--hub-bg);border:1px dashed var(--hub-border);cursor:default}.history h3{width:fit-content;margin-bottom:6px}.dialogue{line-height:1.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.panel :focus-visible{outline:2px solid var(--hub-focus);outline-offset:2px}.tooltip{position:fixed;z-index:20;width:max-content;max-width:330px;padding:9px 11px;background:var(--hub-bg);color:var(--hub-fg);border:1px solid var(--hub-focus);box-shadow:0 2px 8px #0004;white-space:normal;overflow-wrap:anywhere;line-height:1.45;pointer-events:none}.tooltip[hidden]{display:none}.demo-status{}.demo-status:not(:empty){padding:10px 13px}.monograms .intro{padding:23px 18px 17px}.monograms .intro h2{letter-spacing:-.7px}.monograms .folders{display:grid;gap:10px;padding:0 12px 18px}.monograms .folder{border:1px solid var(--hub-border);border-radius:15px;background:var(--hub-card,var(--hub-bg))}.monograms .folder-head{padding:17px 14px;gap:13px}.monograms .mono{height:51px;flex-basis:51px;font-weight:700;border-radius:14px}.monograms .name{letter-spacing:-.35px}.monograms .detail{padding:3px 16px 17px}.monograms .actions button{border-radius:7px;padding:10px 11px}.monograms .current-label{font-weight:600}.demo-original{--hub-card:#fff}.demo-original .mono{background:var(--tone);color:var(--tone-ink)}.demo-original .mint{--tone:#d3e9d9;--tone-ink:#274f3a}.demo-original .peach{--tone:#f4deca;--tone-ink:#734328}.demo-original .lavender{--tone:#e5ddf5;--tone-ink:#644780}.demo-original .blue{--tone:#d5e7ed;--tone-ink:#355567}.demo-original .gray{--tone:#e2e2df;--tone-ink:#55554f}.demo-original .current{border-color:#8ab599}.demo-original .current>.folder-head{box-shadow:none;background:transparent}.demo-original .current-label{color:#32724d}.monograms.demo-contrast .folder{border-width:2px}.theme-grid{grid-template-columns:repeat(auto-fit,minmax(270px,400px))}.theme-example{min-width:0}@media(max-width:380px){.theme-grid{display:block;padding:8px}.theme-example{margin-bottom:22px}.monograms .mono{height:40px;flex-basis:40px}.monograms .folder-head{padding:13px 10px;gap:9px}.monograms .intro h2{}}@media(forced-colors:active){.folder,.mono,.actions button{border-color:ButtonText}.current>.folder-head{outline:2px solid Highlight}.panel :focus-visible{outline-color:Highlight}.actions button[aria-disabled=true]{color:GrayText}}
-.panel .actions button[aria-disabled=true]:hover{background:var(--hub-bg);color:var(--vscode-disabledForeground,#949494)}
+.panel {
+  height: 790px;
+  min-height: 0;
+  overflow: auto;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+}
+.intro {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.info {
+  background: transparent;
+  color: inherit;
+  border: 1px solid transparent;
+  min-width: 28px;
+  min-height: 28px;
+}
+.refresh {
+  min-width: 28px;
+  min-height: 28px;
+}
+.panel .intro h2 {
+}
+.folder-head {
+  border-radius: inherit;
+}
+.folder-head:hover {
+  cursor: pointer;
+}
+.folder-head[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+.activity {
+  display: block;
+  color: var(--hub-muted);
+  margin-top: 4px;
+}
+.current-label {
+}
+.missing-label {
+}
+.detail-wrap {
+  height: 0;
+  overflow: hidden;
+}
+.detail-wrap.open {
+  height: auto;
+}
+.detail {
+  padding-top: 4px !important;
+}
+.actions button {
+}
+.actions button[aria-disabled="true"] {
+  color: var(--vscode-disabledForeground, #949494);
+  background: var(--hub-bg);
+  border: 1px dashed var(--hub-border);
+  cursor: default;
+}
+.history h2 {
+  width: fit-content;
+  margin-bottom: 6px;
+}
+.dialogue {
+  line-height: 1.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.panel :focus-visible {
+  outline: 2px solid var(--hub-focus);
+  outline-offset: 2px;
+}
+.tooltip {
+  position: fixed;
+  z-index: 20;
+  width: max-content;
+  max-width: 330px;
+  padding: 9px 11px;
+  background: var(--hub-bg);
+  color: var(--hub-fg);
+  border: 1px solid var(--hub-focus);
+  box-shadow: 0 2px 8px #0004;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+  pointer-events: none;
+}
+.tooltip[hidden] {
+  display: none;
+}
+.demo-status {
+}
+.demo-status:not(:empty) {
+  padding: 10px 13px;
+}
+.monograms .intro {
+  padding: 23px 18px 17px;
+}
+.monograms .intro h2 {
+  letter-spacing: -0.7px;
+}
+.monograms .folders {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 18px;
+}
+.monograms .folder {
+  border: 1px solid var(--hub-border);
+  border-radius: 15px;
+  background: var(--hub-card, var(--hub-bg));
+}
+.monograms .folder-head {
+  padding: 17px 14px;
+  gap: 13px;
+}
+.monograms .mono {
+  height: 51px;
+  flex-basis: 51px;
+  font-weight: 700;
+  border-radius: 14px;
+}
+.monograms .name {
+  letter-spacing: -0.35px;
+}
+.monograms .detail {
+  padding: 3px 16px 17px;
+}
+.monograms .actions button {
+  border-radius: 7px;
+  padding: 10px 11px;
+}
+.monograms .current-label {
+  font-weight: 600;
+}
+.demo-original {
+  --hub-card: #fff;
+}
+.demo-original .mono {
+  background: var(--tone);
+  color: var(--tone-ink);
+}
+.demo-original .mint {
+  --tone: #d3e9d9;
+  --tone-ink: #274f3a;
+}
+.demo-original .peach {
+  --tone: #f4deca;
+  --tone-ink: #734328;
+}
+.demo-original .lavender {
+  --tone: #e5ddf5;
+  --tone-ink: #644780;
+}
+.demo-original .blue {
+  --tone: #d5e7ed;
+  --tone-ink: #355567;
+}
+.demo-original .gray {
+  --tone: #e2e2df;
+  --tone-ink: #55554f;
+}
+.demo-original .current {
+  border-color: #8ab599;
+}
+.demo-original .current > .folder-head {
+  box-shadow: none;
+  background: transparent;
+}
+.demo-original .current-label {
+  color: #32724d;
+}
+.monograms.demo-contrast .folder {
+  border-width: 2px;
+}
+.theme-grid {
+  grid-template-columns: repeat(auto-fit, minmax(270px, 400px));
+}
+.theme-example {
+  min-width: 0;
+}
+@media (max-width: 380px) {
+  .theme-grid {
+    display: block;
+    padding: 8px;
+  }
+  .theme-example {
+    margin-bottom: 22px;
+  }
+  .monograms .mono {
+    height: 40px;
+    flex-basis: 40px;
+  }
+  .monograms .folder-head {
+    padding: 13px 10px;
+    gap: 9px;
+  }
+  .monograms .intro h2 {
+  }
+}
+@media (forced-colors: active) {
+  .folder,
+  .mono,
+  .actions button {
+    border-color: ButtonText;
+  }
+  .current > .folder-head {
+    outline: 2px solid Highlight;
+  }
+  .panel :focus-visible {
+    outline-color: Highlight;
+  }
+  .actions button[aria-disabled="true"] {
+    color: GrayText;
+  }
+}
+.panel .actions button[aria-disabled="true"]:hover {
+  background: var(--hub-bg);
+  color: var(--vscode-disabledForeground, #949494);
+}
 /* Final accessible override intentionally replaces the legacy base pointer-events:none declaration above. */
-.tooltip{height:auto;max-width:min(330px,calc(100vw - 16px));max-height:calc(100vh - 16px);pointer-events:auto;overflow:auto;overscroll-behavior:contain}
+.tooltip {
+  height: auto;
+  max-width: min(330px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  pointer-events: auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+}

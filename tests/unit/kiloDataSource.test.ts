@@ -277,7 +277,9 @@ void test('bounds rows in SQL without materializing a full ORDER BY sort', () =>
     const details = plan.map(({ detail }) => String(detail)).join('\n');
     assert.doesNotMatch(details, /TEMP B-TREE|ORDER BY/i);
     assert.match(KILO_METADATA_QUERY, /LIMIT 10001/u);
-    assert.match(KILO_METADATA_QUERY, /length\(title\) <= 4096/u);
+    assert.match(KILO_METADATA_QUERY, /substr\(id, 1, 513\)/u);
+    assert.match(KILO_METADATA_QUERY, /substr\(title, 1, 4097\)/u);
+    assert.match(KILO_METADATA_QUERY, /substr\(directory, 1, 4097\)/u);
     assert.match(KILO_METADATA_QUERY, /typeof\(time_created\) = 'integer'/u);
     assert.match(KILO_METADATA_QUERY, /typeof\(time_updated\) = 'integer'/u);
   } finally {

@@ -83,7 +83,7 @@ ORDER BY time_updated DESC;
 
 Запрос не обращается к таблицам messages, parts или transcript. На рабочей базе он вернул 31 root/non-archived session примерно за `1.1 ms`; открытие connection и schema guard заняли менее `8 ms` суммарно в конкретном замере. Эти числа являются discovery evidence, а не универсальным performance budget.
 
-Production Step 2 сохраняет тот же набор колонок и фильтр root/non-archived, но не выполняет SQLite `ORDER BY`: точная сортировка делается presenter после bounded materialization. SQL дополнительно отсекает metadata-поля длиннее `id=512`, `title/directory=4096` и использует `LIMIT 10001`; строка 10001 приводит к контролируемой ошибке вместо частичного списка. Это исключает полный temporary B-tree до применения JS budgets. Общий текстовый бюджет результата ограничен примерно 4 MiB.
+Production Step 2 сохраняет тот же смысловой набор колонок и фильтр root/non-archived, но не выполняет SQLite `ORDER BY`: точная сортировка делается presenter после bounded materialization. Единственный SQL использует `LIMIT 10001` и `CASE/substr`: в Node передаются максимум `id=513`, `title/directory=4097` символов, а timestamps — только safe integer. BLOB/неверный тип превращается в `NULL` внутри SQLite и изолируется row validator. Строка 10001 приводит к контролируемой ошибке вместо частичного списка. Это исключает полный temporary B-tree, второй неограниченный invalid scan и oversized-cell materialization до JS budgets. Общий текстовый бюджет результата ограничен примерно 4 MiB.
 
 ## Schema guard
 
