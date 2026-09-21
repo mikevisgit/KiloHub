@@ -1,0 +1,385 @@
+:root {
+  color-scheme: light dark;
+  --hub-base: var(--vscode-font-size, 13px);
+  --hub-secondary: calc(var(--hub-base) * 0.9230769231);
+  --hub-name-size: calc(var(--hub-base) * 1.2307692308);
+  --hub-mono-size: calc(var(--hub-base) * 2.7692307692);
+  --hub-row-y: calc(var(--hub-base) * 0.8461538462);
+  --hub-row-x: calc(var(--hub-base) * 0.9230769231);
+  --hub-gap: calc(var(--hub-base) * 0.7692307692);
+  --hub-bg: var(--vscode-sideBar-background);
+  --hub-fg: var(--vscode-sideBar-foreground, var(--vscode-foreground));
+  --hub-muted: var(--vscode-descriptionForeground);
+  --hub-border: var(--vscode-sideBar-border, transparent);
+  --hub-focus: var(--vscode-focusBorder);
+  --hub-card: var(--vscode-sideBar-background);
+  --hub-hover: var(--vscode-list-hoverBackground);
+  --hub-hover-fg: var(--vscode-list-hoverForeground, var(--hub-fg));
+  --hub-current-bg: var(--vscode-list-inactiveSelectionBackground);
+  --hub-current-fg: var(--vscode-list-inactiveSelectionForeground, var(--hub-fg));
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--hub-bg);
+  color: var(--hub-fg);
+  font-family: var(--vscode-font-family, "Segoe UI", Arial, sans-serif);
+  font-size: var(--hub-base);
+  font-weight: var(--vscode-font-weight, 400);
+  line-height: 1.4;
+}
+
+button {
+  color: inherit;
+  font: inherit;
+}
+
+.hub {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--hub-bg);
+}
+
+.intro {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex: none;
+  gap: calc(var(--hub-base) * 0.4615384615);
+  padding: var(--hub-gap) var(--hub-row-x);
+}
+
+.intro h1 {
+  min-width: 0;
+  margin: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+  font-size: calc(var(--hub-base) * 1.1538461538);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.icon-button {
+  display: inline-grid;
+  min-width: calc(var(--hub-base) * 1.8461538462);
+  min-height: calc(var(--hub-base) * 1.8461538462);
+  flex: none;
+  place-items: center;
+  padding: calc(var(--hub-base) * 0.1538461538);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.refresh {
+  font-size: calc(var(--hub-base) * 1.2307692308);
+}
+
+.icon-button:hover {
+  background: var(--hub-hover);
+}
+
+.icon-button:disabled {
+  color: var(--vscode-disabledForeground);
+  cursor: default;
+}
+
+.view-status {
+  flex: none;
+  margin: 0;
+  padding: 0 var(--hub-row-x) var(--hub-gap);
+  color: var(--hub-muted);
+}
+
+.view-status:empty {
+  display: none;
+}
+
+.folders {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  align-content: start;
+  gap: var(--hub-gap);
+  padding: calc(var(--hub-base) * 0.2307692308) var(--hub-row-x) var(--hub-gap);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+}
+
+.folder {
+  min-width: 0;
+  margin: 0;
+  overflow: clip;
+  border: 1px solid var(--hub-border);
+  border-radius: 15px;
+  background: var(--hub-card);
+}
+
+.folder-head {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: var(--hub-gap);
+  padding: var(--hub-row-y) var(--hub-row-x);
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.folder-head:hover {
+  background: var(--hub-hover);
+  color: var(--hub-hover-fg);
+}
+
+.folder.current {
+  color: var(--hub-current-fg);
+}
+
+.folder.current > .folder-head {
+  outline: 1px solid var(--vscode-contrastActiveBorder, transparent);
+  outline-offset: -1px;
+  background: var(--hub-current-bg);
+  box-shadow: inset 2px 0 var(--hub-focus);
+}
+
+.folder.missing > .folder-head {
+  border-bottom: 1px dashed var(--vscode-editorWarning-foreground);
+}
+
+.mono {
+  display: grid;
+  width: var(--hub-mono-size);
+  height: var(--hub-mono-size);
+  flex: 0 0 var(--hub-mono-size);
+  place-items: center;
+  border: 1px solid var(--folder-border, transparent);
+  border-radius: 14px;
+  background: var(--folder-bg, var(--vscode-badge-background));
+  color: var(--folder-fg, var(--vscode-badge-foreground));
+  font-size: calc(var(--hub-base) * 1.1538461538);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.identity {
+  min-width: 0;
+  flex: 1;
+}
+
+.folder-name {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: var(--hub-name-size);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.current-label,
+.activity,
+.missing-label {
+  display: block;
+  color: var(--hub-muted);
+  font-size: var(--hub-secondary);
+  line-height: 1.4;
+}
+
+.current-label {
+  margin-bottom: calc(var(--hub-base) * 0.1538461538);
+  color: inherit;
+  font-weight: 600;
+}
+
+.activity,
+.missing-label {
+  margin-top: calc(var(--hub-base) * 0.2307692308);
+}
+
+.missing-label {
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.chevron {
+  flex: 0 0 1em;
+  text-align: center;
+  line-height: 1;
+  transition: transform 320ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.folder-head[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+
+.detail-wrap {
+  height: 0;
+  overflow: hidden;
+}
+
+.detail-wrap[aria-hidden="false"] {
+  height: auto;
+}
+
+.detail {
+  min-width: 0;
+  padding: calc(var(--hub-base) * 0.3076923077) var(--hub-row-x) var(--hub-gap);
+}
+
+.actions {
+  display: grid;
+  gap: calc(var(--hub-base) * 0.3076923077);
+}
+
+.action {
+  display: flex;
+  min-width: 0;
+  min-height: calc(var(--hub-base) * 2.1538461538);
+  padding: calc(var(--hub-base) * 0.3076923077) calc(var(--hub-base) * 0.6153846154);
+  border: 1px solid var(--vscode-contrastBorder, var(--hub-border));
+  border-radius: 7px;
+  background: var(--vscode-button-secondaryBackground, transparent);
+  color: var(--vscode-button-secondaryForeground, var(--hub-fg));
+  text-align: left;
+  cursor: pointer;
+  gap: calc(var(--hub-base) * 0.4615384615);
+  overflow-wrap: anywhere;
+}
+
+.action-icon {
+  width: 1.1em;
+  flex: 0 0 1.1em;
+  text-align: center;
+}
+
+.action.primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.action:hover {
+  background: var(--vscode-button-secondaryHoverBackground, var(--hub-hover));
+}
+
+.action.primary:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.history {
+  margin-top: var(--hub-gap);
+  padding-top: var(--hub-gap);
+  border-top: 1px solid var(--hub-border);
+}
+
+.detail > .history:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.history-title {
+  width: fit-content;
+  margin: 0 0 calc(var(--hub-base) * 0.3076923077);
+  font-size: var(--hub-base);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.conversation-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conversation {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.55;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 20;
+  width: max-content;
+  max-width: min(330px, calc(100vw - 16px));
+  max-height: min(360px, calc(100vh - 16px));
+  padding: calc(var(--hub-base) * 0.6153846154) var(--hub-row-x);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--hub-focus);
+  background: var(--hub-bg);
+  box-shadow: 0 2px 8px #0004;
+  color: var(--hub-fg);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+}
+
+.tooltip[hidden] {
+  display: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--hub-focus);
+  outline-offset: 2px;
+}
+
+body.vscode-reduce-motion .chevron {
+  transition-duration: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition-duration: 0ms;
+  }
+}
+
+@media (forced-colors: active) {
+  .folder {
+    border: 2px solid CanvasText;
+  }
+
+  .folder.current > .folder-head {
+    outline: 2px solid Highlight;
+    box-shadow: none;
+  }
+
+  .mono {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+}

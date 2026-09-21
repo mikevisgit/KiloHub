@@ -2,20 +2,21 @@ import { win32 } from 'node:path';
 
 import * as vscode from 'vscode';
 
-import {
-  KILO_HUB_COMMANDS,
-  type KiloFolderTreeProvider,
-} from './folderTreeProvider.js';
+import { KILO_HUB_COMMANDS } from './commandIds.js';
 import type { KiloFolder } from './types.js';
 import { isAvailableLocalDirectory } from './windowsPathSafety.js';
 
+export type FolderAction = 'openHere' | 'openNewWindow' | 'revealInExplorer';
+
+export interface FolderCommandResolver {
+  resolveFolderCommandReference(argument: unknown): KiloFolder | undefined;
+}
+
 export interface CommandRegistrationOptions {
-  readonly provider: KiloFolderTreeProvider;
+  readonly provider: FolderCommandResolver;
   readonly output: vscode.OutputChannel;
   readonly refresh: () => Promise<void>;
 }
-
-type OpenMode = 'here' | 'newWindow' | 'fileExplorer';
 
 export function openFolderOptions(mode: 'here' | 'newWindow'):
 { forceReuseWindow: true } | { forceNewWindow: true } {
@@ -32,13 +33,7 @@ function technicalError(error: unknown): string {
 }
 
 function parseLocalFolderUri(folder: KiloFolder): vscode.Uri | undefined {
-  let uri: vscode.Uri;
-  try {
-    uri = vscode.Uri.parse(folder.uri, true);
-  } catch {
-    return undefined;
-  }
-
+  const uri = vscode.Uri.file(folder.path);
   if (
     uri.scheme !== 'file'
     || uri.authority !== ''
@@ -55,8 +50,47 @@ async function showInvalidReference(): Promise<void> {
   await vscode.window.showErrorMessage('Не удалось открыть папку: некорректная внутренняя ссылка Kilo Hub.');
 }
 
-async function openFolder(
-  mode: OpenMode,
+export async function executeFolderAction(
+  action: FolderAction,
+  folder: KiloFolder,
+  output: vscode.OutputChannel,
+): Promise<void> {
+  const uri = parseLocalFolderUri(folder);
+  if (uri === undefined) {
+    output.appendLine(`[commands] Отклонён нелокальный или некорректный path папки: ${folder.path}`);
+    await vscode.window.showErrorMessage('Не удалось открыть папку: поддерживаются только локальные папки Windows.');
+    return;
+  }
+
+  try {
+    if (!await isAvailableLocalDirectory(uri.fsPath, 2_000)) {
+      output.appendLine(`[commands] Путь не является доступным локальным каталогом: ${uri.fsPath}`);
+      await vscode.window.showErrorMessage(`Папка недоступна: ${uri.fsPath}`);
+      return;
+    }
+
+    if (action === 'revealInExplorer') {
+      const opened = await vscode.env.openExternal(uri);
+      if (!opened) {
+        output.appendLine(`[commands] VS Code не смог открыть путь во внешнем приложении: ${uri.fsPath}`);
+        await vscode.window.showErrorMessage(`Не удалось открыть папку в Проводнике: ${uri.fsPath}`);
+      }
+      return;
+    }
+
+    await vscode.commands.executeCommand(
+      'vscode.openFolder',
+      uri,
+      openFolderOptions(action === 'openHere' ? 'here' : 'newWindow'),
+    );
+  } catch (error) {
+    output.appendLine(`[commands] Ошибка открытия локальной папки ${uri.fsPath}: ${technicalError(error)}`);
+    await vscode.window.showErrorMessage(`Папка недоступна: ${uri.fsPath}`);
+  }
+}
+
+async function openFolderFromCommand(
+  action: FolderAction,
   argument: unknown,
   options: CommandRegistrationOptions,
 ): Promise<void> {
@@ -66,35 +100,7 @@ async function openFolder(
     await showInvalidReference();
     return;
   }
-
-  const uri = parseLocalFolderUri(folder);
-  if (uri === undefined) {
-    options.output.appendLine(`[commands] Отклонён нелокальный или некорректный URI папки: ${folder.uri}`);
-    await vscode.window.showErrorMessage('Не удалось открыть папку: поддерживаются только локальные папки Windows.');
-    return;
-  }
-
-  try {
-    if (!await isAvailableLocalDirectory(uri.fsPath, 2_000)) {
-      options.output.appendLine(`[commands] Путь не является доступным локальным каталогом: ${uri.fsPath}`);
-      await vscode.window.showErrorMessage(`Папка недоступна: ${uri.fsPath}`);
-      return;
-    }
-
-    if (mode === 'fileExplorer') {
-      const opened = await vscode.env.openExternal(uri);
-      if (!opened) {
-        options.output.appendLine(`[commands] VS Code не смог открыть путь во внешнем приложении: ${uri.fsPath}`);
-        await vscode.window.showErrorMessage(`Не удалось открыть папку в Проводнике: ${uri.fsPath}`);
-      }
-      return;
-    }
-
-    await vscode.commands.executeCommand('vscode.openFolder', uri, openFolderOptions(mode));
-  } catch (error) {
-    options.output.appendLine(`[commands] Ошибка открытия локальной папки ${uri.fsPath}: ${technicalError(error)}`);
-    await vscode.window.showErrorMessage(`Папка недоступна: ${uri.fsPath}`);
-  }
+  await executeFolderAction(action, folder, options.output);
 }
 
 /** Registers the complete Step 1 command surface. */
@@ -105,15 +111,15 @@ export function registerKiloHubCommands(
     vscode.commands.registerCommand(KILO_HUB_COMMANDS.refresh, options.refresh),
     vscode.commands.registerCommand(
       KILO_HUB_COMMANDS.openHere,
-      (argument: unknown) => openFolder('here', argument, options),
+      (argument: unknown) => openFolderFromCommand('openHere', argument, options),
     ),
     vscode.commands.registerCommand(
       KILO_HUB_COMMANDS.openNewWindow,
-      (argument: unknown) => openFolder('newWindow', argument, options),
+      (argument: unknown) => openFolderFromCommand('openNewWindow', argument, options),
     ),
     vscode.commands.registerCommand(
       KILO_HUB_COMMANDS.openInFileExplorer,
-      (argument: unknown) => openFolder('fileExplorer', argument, options),
+      (argument: unknown) => openFolderFromCommand('revealInExplorer', argument, options),
     ),
   ];
 }

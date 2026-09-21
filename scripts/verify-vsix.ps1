@@ -15,6 +15,8 @@ try {
         'extension/LICENSE.txt',
         'extension/build/extension.js',
         'extension/build/kiloDataWorker.js',
+        'extension/build/webview.css',
+        'extension/build/webview.js',
         'extension/docs/release-notes.md',
         'extension/package.json',
         'extension/resources/hub.svg'
@@ -69,8 +71,13 @@ try {
     if ($activityContainers.Count -ne 1 -or
         $activityContainers[0].id -ne 'kiloHub' -or
         $folderViews.Count -ne 1 -or
-        $folderViews[0].id -ne 'kiloHub.folders') {
+        $folderViews[0].id -ne 'kiloHub.folders' -or
+        $folderViews[0].name -ne 'Kilo Hub' -or
+        $folderViews[0].type -ne 'webview') {
         throw 'Unexpected view contributions.'
+    }
+    if ($null -ne $manifest.contributes.menus.'view/title') {
+        throw 'Native view/title menu must not be packaged for Step 2.'
     }
 
     $deploymentEntry = $archive.GetEntry('extension.vsixmanifest')
@@ -85,7 +92,7 @@ try {
         throw 'VSIX target platform is not win32-x64.'
     }
 
-    foreach ($bundleName in @('extension.js', 'kiloDataWorker.js')) {
+    foreach ($bundleName in @('extension.js', 'kiloDataWorker.js', 'webview.js', 'webview.css')) {
         $bundleEntry = $archive.GetEntry("extension/build/$bundleName")
         $bundleStream = $bundleEntry.Open()
         $sha256 = [System.Security.Cryptography.SHA256]::Create()

@@ -2,7 +2,7 @@
   "name": "kilo-hub",
   "displayName": "Kilo Hub",
   "description": "Локальный read-only список папок с диалогами Kilo Code.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "local",
   "private": true,
   "license": "UNLICENSED",
@@ -25,6 +25,7 @@
   "files": [
     "LICENSE.txt",
     "build/*.js",
+    "build/*.css",
     "docs/release-notes.md",
     "resources/**"
   ],
@@ -42,7 +43,8 @@
       "kiloHub": [
         {
           "id": "kiloHub.folders",
-          "name": "Kilo Folders",
+          "name": "Kilo Hub",
+          "type": "webview",
           "visibility": "visible"
         }
       ]
@@ -67,13 +69,6 @@
       }
     ],
     "menus": {
-      "view/title": [
-        {
-          "command": "kiloHub.refresh",
-          "when": "view == kiloHub.folders",
-          "group": "navigation"
-        }
-      ],
       "commandPalette": [
         {
           "command": "kiloHub.openHere",
@@ -97,9 +92,10 @@
     "bundle": "node scripts/build.mjs",
     "build:tests": "tsc -p tsconfig.tests.json",
     "test:unit": "npm run build:tests && node scripts/run-unit-tests.mjs",
+    "test:component": "npm run build:tests && node scripts/run-component-tests.mjs",
     "test:integration": "npm run bundle && npm run build:tests && node scripts/run-extension-tests.mjs",
     "test:installed": "npm run bundle && npm run build:tests && node scripts/run-installed-extension-tests.mjs",
-    "test": "npm run check-types && npm run lint && npm run test:unit && npm run test:integration",
+    "test": "npm run check-types && npm run lint && npm run test:unit && npm run test:component && npm run test:integration",
     "verify:vsix": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-vsix.ps1",
     "package": "npm run bundle && node scripts/package.mjs && npm run verify:vsix"
   },
@@ -111,6 +107,7 @@
     "@vscode/vsce": "4.0.0",
     "esbuild": "0.28.2",
     "eslint": "10.11.0",
+    "happy-dom": "20.14.5",
     "typescript": "5.9.3",
     "typescript-eslint": "8.70.0"
   }
