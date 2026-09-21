@@ -260,7 +260,7 @@ Gate M10: `0.2.1` проходит M6–M8 на одном source commit/hash, �
 
 ### M11. Tooltip hotfix `0.2.2`
 
-Следующий этап M12 (`0.2.3`): единственный hover полного пути на inline `.folder-name`, отсутствие popup на focus и остальных элементах; package PNG вместо стандартной иконки страницы. Gate: component/integration, independent review, воспроизводимый VSIX, exact verification с PNG и установка. В работе, результаты в `handoff.md`.
+Этап M12 (`0.2.3`): единственный hover полного пути на inline `.folder-name`, отсутствие popup на focus и остальных элементах; package PNG вместо стандартной иконки страницы. Automated/source/package/install gate пройден: `62/62` unit, `29/29` component, независимые reviews без findings, две одинаковые сборки, exact verification с PNG и установка в основной профиль. Результаты и checksum в `handoff.md`; пользовательский visual verdict ожидается.
 
 Зависимости: пользовательская проверка установленного `0.2.1`.
 
