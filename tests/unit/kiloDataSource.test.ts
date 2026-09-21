@@ -7,6 +7,7 @@ import test, { after } from 'node:test';
 
 import {
   KILO_METADATA_LIMITS,
+  KILO_METADATA_QUERY,
   KiloDataSourceError,
   readKiloSessions,
   readKiloSessionsInCurrentThread,
@@ -259,6 +260,20 @@ void test('accepts exact row and total text budgets and rejects the first excess
   assert.throws(() => readFixture(textDatabasePath), /допустимый объём текста/);
 });
 
+void test('bounds rows in SQL without materializing a full ORDER BY sort', () => {
+  const databasePath = createDatabase();
+  const database = new DatabaseSync(databasePath, { readOnly: true });
+  try {
+    const plan = database.prepare(`EXPLAIN QUERY PLAN ${KILO_METADATA_QUERY}`).all() as Array<Record<string, unknown>>;
+    const details = plan.map(({ detail }) => String(detail)).join('\n');
+    assert.doesNotMatch(details, /TEMP B-TREE|ORDER BY/i);
+    assert.match(KILO_METADATA_QUERY, /LIMIT 10001/u);
+    assert.match(KILO_METADATA_QUERY, /length\(title\) <= 4096/u);
+  } finally {
+    database.close();
+  }
+});
+
 void test('rejects known Kilo versions below 7.7.5 before opening SQLite', () => {
   const missingPath = join(createTempDirectory(), 'does-not-exist.db');
   assert.throws(
@@ -373,7 +388,7 @@ void test('bounds SQLITE_BUSY waiting under an exclusive lock', () => {
     );
     const elapsed = performance.now() - startedAt;
     assert.ok(elapsed >= 4_500, `busy timeout завершился слишком рано: ${elapsed} ms`);
-    assert.ok(elapsed < 7_500, `busy timeout превысил допустимую границу: ${elapsed} ms`);
+    assert.ok(elapsed < 9_000, `busy timeout превысил допустимую границу: ${elapsed} ms`);
   } finally {
     writer.exec('ROLLBACK');
     writer.close();

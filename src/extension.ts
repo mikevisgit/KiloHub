@@ -5,6 +5,7 @@ import {
   registerKiloHubCommands,
 } from './commands.js';
 import type { WorkspaceDescriptor } from './currentFolder.js';
+import { sanitizeDiagnostic } from './diagnostics.js';
 import {
   KILO_HUB_VIEW_ID,
   KiloHubWebviewProvider,
@@ -88,7 +89,7 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   const workspaceSubscription = vscode.workspace.onDidChangeWorkspaceFolders(() => {
     void provider.workspaceChanged().catch((error: unknown) => {
-      output.appendLine(`[workspace] ${error instanceof Error ? error.stack ?? error.message : String(error)}`);
+      output.appendLine(`[workspace] ${sanitizeDiagnostic(error)}`);
     });
   });
 

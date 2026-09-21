@@ -56,7 +56,7 @@ CSS использует десятичные эквиваленты дробе�
 | Actions | grid, gap4/13B | 4px |
 | Действие | min-height28/13B, min-width0, padding4/13B 8/13B; flex gap8px | min28px,V4/H8px |
 | История | margin-top G,padding-top G,border-top1px | 10/10/1px |
-| History h3 | widthfit-content, margin-bottom4/13B | 4px |
+| History h2 | widthfit-content, margin-bottom4/13B | 4px |
 | Диалоги | margin0, без row-gap/padding | Шаг20,15px |
 | Непустой demo-status | padding G X | V10/H12px |
 | Tooltip | padding8/13B X | V8/H12px |

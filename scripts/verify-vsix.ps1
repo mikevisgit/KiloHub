@@ -59,6 +59,9 @@ try {
     if ($manifest.engines.vscode -ne '^1.105.1') {
         throw "Unexpected engines.vscode: $($manifest.engines.vscode)"
     }
+    if ($manifest.engines.node -ne '>=22.19.0 <25') {
+        throw "Unexpected engines.node: $($manifest.engines.node)"
+    }
     $extensionKinds = @($manifest.extensionKind)
     if ($extensionKinds.Count -ne 1 -or $extensionKinds[0] -ne 'ui') {
         throw 'Unexpected extensionKind.'

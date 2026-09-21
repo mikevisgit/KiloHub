@@ -2,7 +2,7 @@
 
 ## Назначение и статус
 
-Матрица трассирует существенные требования Step 2 к обязательным автоматическим и ручным доказательствам. Она не объявляет Webview или VSIX реализованными: текущий этап формирует ТЗ, а все production-gates ниже должны быть повторно выполнены на одном итоговом commit и одном VSIX.
+Матрица трассирует существенные требования Step 2 к обязательным автоматическим и ручным доказательствам. Production Webview реализован и имеет source/component/Extension Host evidence, но release не считается завершённым до exact VSIX, installed min/current gates, финальных review и пользовательского checklist на одном commit/hash.
 
 Источники требований в порядке приоритета:
 
@@ -15,8 +15,9 @@
 
 - **ТЗ: зафиксировано** — требование и способ доказательства определены; это не результат production-теста.
 - **Макет: есть offline evidence** — локальные проверки подтверждают reference-логику или структуру, но не Webview runtime.
-- **Production: требуется** — доказательство должно быть получено после реализации на итоговом коде/VSIX.
-- **Production: manual** — публичный API VS Code не даёт достаточного автоматического доказательства; нужен установленный VSIX и [ручной чек-лист](04-manual-acceptance-checklist.md).
+- **Automated PASS** — указанный source/component/Extension Host test проходит на текущем production-кандидате; release gate повторяет его на итоговом commit.
+- **Package pending** — source/build contract реализован, но exact VSIX/hash/install evidence ещё не получен.
+- **Manual pending** — публичный API VS Code не даёт достаточного browser/GUI доказательства; нужен установленный VSIX и [ручной чек-лист](04-manual-acceptance-checklist.md).
 
 ## Матрица
 
@@ -58,6 +59,49 @@
 | PKG-02 | VSIX не содержит tests/fixtures/`req`/`reviews`/`old_donotuse`/demo themes/source maps/DB/WAL/SHM/node_modules и иных неразрешённых файлов. | Exact allow-list archive test, а не только поиск известных запрещённых имён. | При необходимости приложить listing архива; ручная проверка не заменяет exact verifier. | ТЗ: зафиксировано; Production: требуется. |
 | PKG-03 | Проверенный `0.2.0` устанавливается в изолированные `--user-data-dir`/`--extensions-dir`, активируется, загружает browser assets и выполняет packaged-worker refresh на минимальной и актуальной поддерживаемой VS Code. | Installed Extension Host test запускается только после exact verifier и проверяет installed identity/version, activation, protocol handshake, asset load и refresh. | Открыть установленный Hub в изолированном профиле; выполнить полный checklist на зафиксированной версии VS Code/Kilo. | ТЗ: зафиксировано; Production: требуется/manual. |
 | SCOPE-01 | Нет сети, telemetry, LLM, поиска, избранного, copy path, ручного реестра/цветов, открытия диалога, auto watcher, собственного storage или миграции Kilo. | Manifest/bundle/import/network scan; negative DOM/command contribution assertions; storage write spies. | Отсутствие лишних элементов в UI; Network пуст в штатном сценарии. | ТЗ: зафиксировано; Production: требуется/manual. |
+
+## Текущая traceability production-кандидата
+
+Имена тестов ниже являются обязательными ссылками на текущий source evidence. `Manual pending` означает, что соответствующий пункт `04-manual-acceptance-checklist.md` должен быть выполнен пользователем на итоговом установленном VSIX; это не снижает статус пройденных automated checks и не объявляет manual результат заранее.
+
+| ID | Точный automated evidence | Manual ID | Текущий статус |
+| --- | --- | --- | --- |
+| DATA-01 | `kiloDataSource.test.ts`: root/non-archived projection, query-only/read-only, WAL, busy, worker responsiveness, file cleanup; integration DB fingerprints | `M-REF-01..04` | Automated PASS; manual pending |
+| DATA-02 | `projection.test.ts`: normalization/filter/group/deduplicate/malformed/availability; `windowsPathSafety.test.ts`: resolved local/UNC | `M-DATA-01`, `M-MISS-01` | Automated PASS; manual pending |
+| PRES-01 | `tests/integration/index.ts`: manifest view `Kilo Hub` type `webview`, no `view/title`; `webviewMain.test.ts`: one `h1`, no `Kilo Folders` | `M-LAYOUT-01` | Automated PASS; manual pending |
+| PRES-02 | `presentation.test.ts`: deterministic full folders/max3 DTO; protocol DTO exact keys/bounds | `M-DATA-01` | Automated PASS; manual pending |
+| PRES-03 | `currentFolder.test.ts`; `presentation.test.ts` current-first; integration action workspace races | `M-CURRENT-01..03` | Automated PASS; manual pending |
+| PRES-04 | `presentation.test.ts` and `webviewMain.test.ts`: all boundaries, future/invalid, DST/leap, focus refresh | `M-DATE-01..02` | Automated PASS; manual pending |
+| PRES-05 | `presentation.test.ts`: deterministic folders/conversations/reordered input; `projection.test.ts` tie-breaks | `M-DATE-02`, `M-PERF-02` | Automated PASS; manual pending |
+| MONO-01 | `presentation.test.ts`: NFC/graphemes/digits/fallback; `webviewMain.test.ts`: monogram `aria-hidden` | `M-A11Y-03` | Automated PASS; manual pending |
+| COLOR-01 | `presentation.test.ts`: normalization/FNV/all 16 slots; renderer preserves slot on state/theme update | `M-THEME-01..06` | Automated PASS; manual pending |
+| COLOR-02 | `presentation.test.ts`: adaptive contrast/border; `webviewMain.test.ts`: nonce palette/theme mutation; `stylesContract.test.ts`: forced colors | `M-THEME-01..06` | Automated PASS in source scope; manual contrast pending |
+| VIEW-01 | `webviewMain.test.ts`: text-only keyed DOM, max3 passive titles, one sr-only full text; `stylesContract.test.ts`: overflow/horizontal bounds | `M-LAYOUT-01..04`, `M-ZOOM-01..02` | Automated PASS; manual geometry pending |
+| ACT-01 | `webviewMain.test.ts`: exact current/missing DOM/Tab matrix; integration host authorization races | `M-ACT-01..03`, `M-CURRENT-01`, `M-MISS-01` | Automated PASS; manual actions pending |
+| ACT-02 | `openFolderOptions` integration assertions; integration final guard/path/current/revision races | `M-ACT-01..03` | Automated PASS for API contract; real GUI pending |
+| PROTO-01 | `webviewProtocol.test.ts`, `webviewState.test.ts`, `webviewMain.test.ts`: revision/duplicate/out-of-order/cancel | `M-REF-01..04` | Automated PASS |
+| PROTO-02 | `webviewProtocol.test.ts`: exact ready/refresh/folderAction hostile payloads; integration real ready handshake | `M-REF-01` | Automated PASS; installed handshake pending |
+| PROTO-03 | integration workspace/revision/final-guard races; `windowsPathSafety.test.ts` canonical target | `M-ACT-01..03`, `M-MISS-01` | Automated PASS; GUI pending |
+| SEC-01 | `webviewMain.test.ts`: hostile text/textContent/no executable DOM; protocol hostile object tests | `M-SEC-01` | Automated PASS; manual visual pending |
+| SEC-02 | integration exact CSP/nonce/no unsafe directives/local roots; `verify-webview-bundle.mjs` network/Node/eval scan | `M-SEC-02` | Automated PASS; installed Console/Network pending |
+| ASSET-01 | clean `build.mjs`; bundle scan; `vsce ls`; exact/negative verifier scripts | `M-PKG-01` | Source/build PASS; exact packaged execution pending |
+| REF-01 | `webviewState.test.ts` initial/empty; `webviewMain.test.ts` exact copy/busy/disabled | `M-REF-01..02` | Automated PASS; announcements pending |
+| REF-02 | state reducer deferred/coalesced/stale tests; provider integration concurrent refresh/removal; keyed DOM retention | `M-REF-03` | Automated PASS; manual slow refresh pending |
+| REF-03 | reducer initial/refresh error retention/retry; provider rejected-load integration; text-only UI error | `M-REF-04` | Automated PASS; manual recovery pending |
+| ACC-01 | `accordion.test.ts`: one/repeat/rapid latest/cubic; `webviewMain.test.ts` keyed expansion | `M-ACC-01..02` | Automated PASS; perceived timing pending |
+| ACC-02 | `accordion.test.ts`: body/media reduced motion with focus/scroll invariants; CSS contract | `M-MOTION-01` | Automated PASS; OS/VS Code setting pending |
+| ACC-03 | `accordion.test.ts`: mocked middle/top/bottom/long/reversal/clamping | `M-SCROLL-01..03` | Automated PASS; Chromium geometry pending |
+| FOCUS-01 | `accordion.test.ts` focus-before-inert; `webviewMain.test.ts` same/nearest/refresh fallback; CSS focus contract | `M-A11Y-03..09` | Automated PASS; keyboard/NVDA pending |
+| TIP-01 | `tooltip.test.ts`: owner/popup/focus/Escape/document/dispose/viewport; stable ARIA tests | `M-TIP-01..06`, `M-NVDA-01` | Automated PASS; Chromium/NVDA pending |
+| TIP-02 | `tooltip.test.ts`: immediate show, 120 ms grace, one visible, stale-popup regression; renderer exact owner text | `M-TIP-01..06` | Automated PASS; manual pending |
+| THEME-01 | palette/theme mutation component tests; CSS focus/HC contract; exact built-in IDs in checklist | `M-THEME-01..04` | Automated source PASS; real contrast pending |
+| THEME-02 | semantic token/CSS fallback/forced-colors source tests; no full custom theme CSS in package | `M-THEME-05..06` | Automated source PASS; best-effort manual pending |
+| SCALE-01 | `stylesContract.test.ts`: B=13/16/20, 260/320/400, no shrink/horizontal contract | `M-LAYOUT-02..04`, `M-ZOOM-01..02` | Automated source PASS; real geometry pending |
+| PERF-01 | `projection.test.ts`/`presentation.test.ts` 1000 sessions; `webviewMain.test.ts` 1000-folder heartbeat/cancel; integration concurrent read | `M-PERF-01` | Automated PASS; subjective observation pending |
+| PKG-01 | manifest integration, clean four-output build, exact verifier/version/engines/hash assertions | `M-PKG-01` | Source/build PASS; VSIX pending |
+| PKG-02 | positive `files`, clean `vsce ls`, exact entry verifier and negative extra/missing/stale scripts | `M-PKG-01` | Selection PASS; packaged negative execution pending |
+| PKG-03 | parameterized minimum/current development runners and browser-ready fail-closed integration | `M-PKG-01` plus full checklist | Development min/current PASS; installed VSIX pending |
+| SCOPE-01 | exact manifest/command tests, browser forbidden-primitive scan, empty runtime dependency tree, read-only adapter tests | `M-SCOPE-01` | Automated PASS; manual UI/Network pending |
 
 ## Таблица действий по состояниям
 

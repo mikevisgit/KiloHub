@@ -357,6 +357,32 @@ async function testHostProviderContract(repositoryRoot: string): Promise<void> {
   }
 }
 
+async function testRefreshRequiresResolvedWebview(repositoryRoot: string): Promise<void> {
+  let reads = 0;
+  const provider = new KiloHubWebviewProvider({
+    extensionUri: vscode.Uri.file(repositoryRoot),
+    output: { appendLine: () => undefined } as unknown as vscode.OutputChannel,
+    loadFolders: () => { reads += 1; return Promise.resolve([]); },
+    workspaceDescriptor: () => Promise.resolve({
+      folderCount: 0,
+      path: null,
+      scheme: null,
+      authority: null,
+      workspaceFile: null,
+      remote: false,
+    }),
+    executeAction: () => Promise.resolve(),
+    revealView: () => Promise.resolve(),
+    browserReadyTimeoutMs: 20,
+  });
+  try {
+    await assert.rejects(provider.refresh(), /не был создан/u);
+    assert.equal(reads, 0);
+  } finally {
+    provider.dispose();
+  }
+}
+
 export async function run(): Promise<void> {
   const expectedNode = process.env.KILO_HUB_EXPECTED_NODE;
   const expectedElectron = process.env.KILO_HUB_EXPECTED_ELECTRON;
@@ -378,6 +404,7 @@ export async function run(): Promise<void> {
   const repositoryRoot = resolve(__dirname, '..', '..', '..');
   assert.equal(existsSync(join(repositoryRoot, 'build', 'webview', 'webview.js')), true);
   assert.equal(existsSync(join(repositoryRoot, 'build', 'webview', 'webview.css')), true);
+  await testRefreshRequiresResolvedWebview(repositoryRoot);
   await testHostProviderContract(repositoryRoot);
 
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'kilo-hub-extension-'));

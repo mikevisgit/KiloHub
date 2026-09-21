@@ -3,6 +3,7 @@ import { win32 } from 'node:path';
 import * as vscode from 'vscode';
 
 import { KILO_HUB_COMMANDS } from './commandIds.js';
+import { sanitizeDiagnostic } from './diagnostics.js';
 import type { KiloFolder } from './types.js';
 import { resolveAvailableLocalDirectory } from './windowsPathSafety.js';
 
@@ -27,13 +28,6 @@ export function openFolderOptions(mode: 'here' | 'newWindow'):
   return mode === 'here'
     ? { forceReuseWindow: true }
     : { forceNewWindow: true };
-}
-
-function technicalError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.stack ?? `${error.name}: ${error.message}`;
-  }
-  return String(error);
 }
 
 function redactPath(value: string, ...paths: readonly string[]): string {
@@ -120,7 +114,7 @@ export async function executeFolderAction(
       openFolderOptions(action === 'openHere' ? 'here' : 'newWindow'),
     );
   } catch (error) {
-    const detail = redactPath(technicalError(error), folder.path, uri.fsPath, resolvedPath ?? '');
+    const detail = redactPath(sanitizeDiagnostic(error), folder.path, uri.fsPath, resolvedPath ?? '');
     output.appendLine(`[commands] Ошибка открытия локальной папки: ${detail}`);
     await vscode.window.showErrorMessage('Папка недоступна или больше не может быть открыта.');
   }

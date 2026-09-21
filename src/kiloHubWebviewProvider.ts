@@ -8,6 +8,7 @@ import {
 } from './commands.js';
 import { resolveCurrentFolder } from './currentFolder.js';
 import type { WorkspaceDescriptor } from './currentFolder.js';
+import { sanitizeDiagnostic } from './diagnostics.js';
 import { presentFolders } from './presentation.js';
 import type { KiloFolder } from './types.js';
 import {
@@ -46,15 +47,9 @@ export interface KiloHubWebviewDependencies {
     folder: KiloFolder,
     finalGuard: FinalFolderActionGuard,
   ) => Promise<void>;
+  readonly revealView?: () => Thenable<unknown>;
   readonly now?: () => Date;
   readonly browserReadyTimeoutMs?: number;
-}
-
-function technicalError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.stack ?? `${error.name}: ${error.message}`;
-  }
-  return String(error);
 }
 
 function protocolAction(action: BrowserFolderActionMessage['action']): FolderAction {
@@ -134,7 +129,7 @@ implements vscode.WebviewViewProvider, vscode.Disposable, FolderCommandResolver 
     if (this.refreshInFlight !== undefined) {
       return this.refreshInFlight;
     }
-    const operation = this.performRefreshWhenReady();
+    const operation = this.performRefreshAfterViewReady();
     this.refreshInFlight = operation;
     try {
       await operation;
@@ -145,6 +140,30 @@ implements vscode.WebviewViewProvider, vscode.Disposable, FolderCommandResolver 
           void this.refresh().catch(() => undefined);
         }
       }
+    }
+  }
+
+  private async performRefreshAfterViewReady(): Promise<void> {
+    await this.ensureResolvedView();
+    return this.performRefreshWhenReady();
+  }
+
+  private async ensureResolvedView(): Promise<void> {
+    if (this.view !== undefined) {
+      return;
+    }
+    await (this.dependencies.revealView?.()
+      ?? vscode.commands.executeCommand('workbench.view.extension.kiloHub'));
+    const timeoutMs = this.dependencies.browserReadyTimeoutMs ?? DEFAULT_BROWSER_READY_TIMEOUT_MS;
+    const deadline = Date.now() + timeoutMs;
+    while (!this.disposed && this.view === undefined && Date.now() < deadline) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+    }
+    if (this.disposed) {
+      throw new Error('Kilo Hub закрыт до создания Webview.');
+    }
+    if (this.view === undefined) {
+      throw new Error(`Webview Kilo Hub не был создан в течение ${timeoutMs} ms.`);
     }
   }
 
@@ -197,7 +216,10 @@ implements vscode.WebviewViewProvider, vscode.Disposable, FolderCommandResolver 
   private async waitForBrowserReady(): Promise<void> {
     const view = this.view;
     const generation = this.viewGeneration;
-    if (view === undefined || this.browserReady || !this.isActiveView(view, generation)) {
+    if (view === undefined || !this.isActiveView(view, generation)) {
+      throw new Error('Webview Kilo Hub закрыт до готовности.');
+    }
+    if (this.browserReady) {
       return;
     }
 
@@ -291,7 +313,7 @@ implements vscode.WebviewViewProvider, vscode.Disposable, FolderCommandResolver 
         type: 'loadFailed',
         requestRevision,
       });
-      this.dependencies.output.appendLine(`[refresh] ${technicalError(error)}`);
+      this.dependencies.output.appendLine(`[refresh] ${sanitizeDiagnostic(error)}`);
       await this.publishState();
       throw error;
     }
@@ -316,7 +338,7 @@ implements vscode.WebviewViewProvider, vscode.Disposable, FolderCommandResolver 
         type: 'loadFailed',
         requestRevision,
       });
-      this.dependencies.output.appendLine(`[workspace] ${technicalError(error)}`);
+      this.dependencies.output.appendLine(`[workspace] ${sanitizeDiagnostic(error)}`);
       await this.publishState();
       throw error;
     }
@@ -355,7 +377,7 @@ implements vscode.WebviewViewProvider, vscode.Disposable, FolderCommandResolver 
         finalGuard,
       );
     } catch (error) {
-      this.dependencies.output.appendLine(`[webview] Ошибка выполнения действия: ${technicalError(error)}`);
+      this.dependencies.output.appendLine(`[webview] Ошибка выполнения действия: ${sanitizeDiagnostic(error)}`);
     }
   }
 
@@ -389,7 +411,7 @@ implements vscode.WebviewViewProvider, vscode.Disposable, FolderCommandResolver 
       workspace = await this.dependencies.workspaceDescriptor();
     } catch (error) {
       if (logRejection) {
-        this.dependencies.output.appendLine(`[workspace] Не удалось повторно проверить current: ${technicalError(error)}`);
+        this.dependencies.output.appendLine(`[workspace] Не удалось повторно проверить current: ${sanitizeDiagnostic(error)}`);
       }
       return undefined;
     }
@@ -420,7 +442,7 @@ implements vscode.WebviewViewProvider, vscode.Disposable, FolderCommandResolver 
       }
     } catch (error) {
       if (this.isActiveView(view, generation)) {
-        this.dependencies.output.appendLine(`[webview] Ошибка postMessage: ${technicalError(error)}`);
+        this.dependencies.output.appendLine(`[webview] Ошибка postMessage: ${sanitizeDiagnostic(error)}`);
       }
     }
   }

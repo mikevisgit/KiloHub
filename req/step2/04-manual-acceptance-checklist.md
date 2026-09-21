@@ -162,6 +162,14 @@ NVDA запускается до открытия Hub. Фиксируются д
 | M-ACT-07 | Folder удалена после render до action | Host повторно валидирует snapshot/path, ничего не открывает, показывает безопасную понятную ошибку. | | | |
 | M-ACT-08 | Быстрый refresh сменил revision до action | Stale action не исполняется против нового snapshot; нет произвольной команды/path. | | | |
 
+## Безопасность и границы scope
+
+| ID | Сценарий | Ожидаемый результат | Evidence | Результат | Исполнитель |
+| --- | --- | --- | --- | --- | --- |
+| M-SEC-01 | Обезличенная fixture содержит `<script>`, `<img onerror>`, quotes, bidi/control и `javascript:` в name/path/title | Значения видимы только как текст; script/img/handler не создаются, действий и переходов не возникает. | | | |
+| M-SEC-02 | Открыть DevTools Console/Network при загрузке, refresh, раскрытии, tooltip и смене темы | Нет CSP violations, 404 browser assets и внешних network requests от Kilo Hub. | | | |
+| M-SCOPE-01 | Осмотреть установленный UI и contributions | Нет поиска, избранного, copy path, ручного реестра/цветов, открытия диалога, auto watcher, telemetry, LLM или собственного storage. | | | |
+
 ## 1000 sessions без числового SLA
 
 | ID | Сценарий и ожидаемые инварианты | Evidence | Результат | Исполнитель |

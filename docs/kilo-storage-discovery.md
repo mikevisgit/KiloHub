@@ -83,6 +83,8 @@ ORDER BY time_updated DESC;
 
 Запрос не обращается к таблицам messages, parts или transcript. На рабочей базе он вернул 31 root/non-archived session примерно за `1.1 ms`; открытие connection и schema guard заняли менее `8 ms` суммарно в конкретном замере. Эти числа являются discovery evidence, а не универсальным performance budget.
 
+Production Step 2 сохраняет тот же набор колонок и фильтр root/non-archived, но не выполняет SQLite `ORDER BY`: точная сортировка делается presenter после bounded materialization. SQL дополнительно отсекает metadata-поля длиннее `id=512`, `title/directory=4096` и использует `LIMIT 10001`; строка 10001 приводит к контролируемой ошибке вместо частичного списка. Это исключает полный temporary B-tree до применения JS budgets. Общий текстовый бюджет результата ограничен примерно 4 MiB.
+
 ## Schema guard
 
 SQLite `user_version=0`, `application_id=0`, а `schema_version` является внутренним counter и не кодирует версию Kilo. Поле `session.version` относится к создателю отдельной session и также не является версией schema.

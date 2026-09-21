@@ -17,7 +17,15 @@ export const KILO_METADATA_LIMITS = Object.freeze({
   characters: 4 * 1_024 * 1_024,
 });
 
-const METADATA_QUERY = `SELECT
+const SQL_VALID_METADATA = `
+  typeof(id) = 'text'
+  AND length(trim(id)) BETWEEN 1 AND ${KILO_METADATA_LIMITS.idLength}
+  AND typeof(title) = 'text'
+  AND length(title) <= ${KILO_METADATA_LIMITS.textLength}
+  AND typeof(directory) = 'text'
+  AND length(directory) BETWEEN 1 AND ${KILO_METADATA_LIMITS.textLength}`;
+
+export const KILO_METADATA_QUERY = `SELECT
   id,
   title,
   directory,
@@ -28,7 +36,14 @@ const METADATA_QUERY = `SELECT
 FROM session
 WHERE parent_id IS NULL
   AND time_archived IS NULL
-ORDER BY time_updated DESC`;
+  AND ${SQL_VALID_METADATA}
+LIMIT ${KILO_METADATA_LIMITS.rows + 1}`;
+
+const INVALID_METADATA_COUNT_QUERY = `SELECT count(*) AS count
+FROM session
+WHERE parent_id IS NULL
+  AND time_archived IS NULL
+  AND NOT (${SQL_VALID_METADATA})`;
 
 const REQUIRED_SESSION_COLUMNS = new Map<string, {
   type: string;
@@ -224,7 +239,7 @@ function assertCompatibleSchema(database: DatabaseSync): void {
   }
 
   // Preparing the production query is the final compatibility check.
-  database.prepare(METADATA_QUERY);
+  database.prepare(KILO_METADATA_QUERY);
 }
 
 function readTimestamp(value: unknown): number | undefined {
@@ -285,9 +300,22 @@ export function readKiloSessionsInCurrentThread(
     assertCompatibleSchema(database);
     const sessions: RawSessionMetadata[] = [];
     const warnings: string[] = [];
+    const invalidCountRow = database.prepare(INVALID_METADATA_COUNT_QUERY).get() as Record<string, unknown>;
+    const invalidCount = typeof invalidCountRow.count === 'number'
+      && Number.isSafeInteger(invalidCountRow.count)
+      && invalidCountRow.count > 0
+      ? invalidCountRow.count
+      : 0;
+    const fieldWarningCount = Math.min(invalidCount, MAX_WARNING_COUNT);
+    for (let index = 0; index < fieldWarningCount; index += 1) {
+      warnings.push(`Строка session #${index + 1} пропущена: некорректные metadata-поля.`);
+    }
+    if (invalidCount > MAX_WARNING_COUNT) {
+      warnings.push('Дополнительные предупреждения о повреждённых session подавлены.');
+    }
     let rowCount = 0;
     let characterCount = 0;
-    const rows = database.prepare(METADATA_QUERY).iterate() as Iterable<Record<string, unknown>>;
+    const rows = database.prepare(KILO_METADATA_QUERY).iterate() as Iterable<Record<string, unknown>>;
     for (const row of rows) {
       rowCount += 1;
       if (rowCount > KILO_METADATA_LIMITS.rows) {
@@ -384,10 +412,19 @@ export function readKiloSessions(
     worker.once('error', onError);
     worker.once('exit', onExit);
     timeout = setTimeout(() => {
-      settle(() => {
-        void worker.terminate().catch(() => undefined);
-        reject(new KiloDataSourceError(`SQLite worker превысил лимит ${WORKER_TIMEOUT_MS} ms.`));
-      });
+      if (settled) return;
+      settled = true;
+      cleanup();
+      const timeoutError = new KiloDataSourceError(
+        `SQLite worker превысил лимит ${WORKER_TIMEOUT_MS} ms.`,
+      );
+      void worker.terminate().then(
+        () => reject(timeoutError),
+        (terminationError: unknown) => reject(new KiloDataSourceError(
+          timeoutError.message,
+          { cause: terminationError },
+        )),
+      );
     }, WORKER_TIMEOUT_MS);
   });
 }

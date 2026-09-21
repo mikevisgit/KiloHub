@@ -51,3 +51,25 @@ Remediation не завершён, пока:
 3. targeted re-review четырёх domains не подтвердит отсутствие открытых findings;
 4. full review чистого release-candidate commit не даст `Blocker=0`, `High=0`, а все Medium/Low будут закрыты;
 5. exact VSIX hash не пройдёт package/repro/install gate.
+
+## Targeted re-review и второй набор исправлений
+
+Targeted re-review commit `c5cd72b` подтвердил закрытие всех исходных Requirements и Accessibility findings, но нашёл один общий Low в документации (`History h3` вместо production `h2`); размерная спецификация исправлена.
+
+Security re-review оставил `MEDIUM-04` и `LOW-02`. Исправления второго набора:
+
+- metadata SQL больше не создаёт полный `ORDER BY` temporary B-tree: field bounds и `LIMIT 10001` применяются до Node materialization, сортировка выполняется bounded presenter;
+- query-plan regression запрещает `TEMP B-TREE`; oversized rows считаются отдельно без передачи длинных полей в DTO;
+- worker timeout ожидает `worker.terminate()`;
+- глобальный semaphore удерживает максимум 16 фактически незавершённых `realpath/stat` probes даже после Promise timeout;
+- все host/adapter/command exception diagnostics проходят единую path/control/length sanitization и отдельные tests.
+
+Testability re-review оставил browser-ready High, три Medium и ожидаемый package Blocker. Исправления:
+
+- public refresh fail-closed открывает view, ждёт `resolveWebviewView` и browser `ready`; без view/bundle/CSP handshake SQLite read не начинается;
+- minimum/current test hosts получают отдельную временную Windows app/mutex identity, исходный `product.json` восстанавливается в `finally`;
+- release runner выполняет два независимых `npm ci → audit → clean → full test → package` cycles и сравнивает SHA-256;
+- verifier фиксирует `engines.node`, negative harness дополнен mutated manifest;
+- каждая строка Step 2 matrix связана с точным test file/name и manual ID; checklist дополнен security/scope cases.
+
+Automated evidence после второго набора: `60/60` unit, `29/29` component, full `npm test`, VS Code `1.105.1` и `1.138.0` exit `0`, audit `0 vulnerabilities`, browser scan pass. Source targeted re-review повторяется на новом commit; package Blocker закрывается только фактическим release gate.

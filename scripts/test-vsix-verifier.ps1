@@ -44,3 +44,17 @@ try {
     try { $writer.Write('stale') } finally { $writer.Dispose() }
 } finally { $archive.Dispose() }
 Assert-VerificationFails $stale 'stale browser bundle'
+
+$engine = Copy-Candidate 'wrong-node-engine.vsix'
+$archive = [System.IO.Compression.ZipFile]::Open($engine, [System.IO.Compression.ZipArchiveMode]::Update)
+try {
+    $manifestEntry = $archive.GetEntry('extension/package.json')
+    $reader = [System.IO.StreamReader]::new($manifestEntry.Open())
+    try { $packagedManifest = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+    $manifestEntry.Delete()
+    $packagedManifest.engines.node = '>=99'
+    $replacement = $archive.CreateEntry('extension/package.json')
+    $writer = [System.IO.StreamWriter]::new($replacement.Open())
+    try { $writer.Write(($packagedManifest | ConvertTo-Json -Depth 100 -Compress)) } finally { $writer.Dispose() }
+} finally { $archive.Dispose() }
+Assert-VerificationFails $engine 'wrong Node engine'

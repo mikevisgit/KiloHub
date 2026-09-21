@@ -9,7 +9,7 @@
 - [x] Требования, дизайн, размерная спецификация, тестовая матрица и ручной чек-лист подготовлены и прочитаны.
 - [x] Текущий production-код Step 1, unit/integration tests, build/package/install scripts и ограничения release-процесса изучены.
 - [x] Baseline Step 1 зафиксирован повторным чистым прогоном.
-- [ ] Production-реализация Step 2 начата.
+- [x] Production-реализация Step 2 начата.
 - [ ] Production-тесты, независимые ревью, VSIX `0.2.0`, установка и ручная приёмка выполнены.
 
 Отметки `[x]` выше означают только готовность входных требований и дизайна. Offline-макет и его проверки не являются доказательством production Webview, установленного VSIX или живого browser-rendering.
@@ -185,7 +185,7 @@ Gate M5: negative authorization/fuzz/XSS/CSP tests доказывают отсу
 - [x] Обновить `package.json`: version `0.2.0`, view `type: "webview"`, name `Kilo Hub`, отсутствие старого view-title refresh, только заявленные команды и прежний `extensionKind: ["ui"]`.
 - [x] Расширить TypeScript/build/lint/test scripts для browser и component tests, не ослабляя strict TypeScript или ESLint.
 - [x] Сохранить все Step 1 adapter/projection/path/read-only/WAL/busy/event-loop tests как regressions.
-- [ ] Покрыть все строки `req/step2/03-test-matrix.md` ссылкой на automated test либо явный manual ID; отсутствие публичного API не заменять фиктивным unit test.
+- [x] Покрыть все строки `req/step2/03-test-matrix.md` ссылкой на automated test либо явный manual ID; отсутствие публичного API не заменять фиктивным unit test.
 - [x] Добавить 1000-session regression: все folders/sort/limit/actions/revision верны, worker и browser render дают event-loop heartbeat, parallel reads отсутствуют. Время записать диагностически без нового pass/fail SLA.
 - [x] Проверить exact manifest/activation/command surface и отсутствие TreeView contract.
 - [x] Проверить development Extension Host на VS Code `1.105.1` и Current Stable `1.138.0`: activation, browser-ready handshake, Webview provider, worker refresh и неизменность fixture DB.
@@ -197,13 +197,13 @@ Gate M6: полный suite зелёный из clean checkout; traceability н�
 
 Зависимости: M6; package review завершается вместе с M8.
 
-- [ ] Независимо проверить трассировку требований и отсутствие scope creep.
-- [ ] Независимо проверить read-only/metadata-only backend и security residuals Step 1.
-- [ ] Независимо проверить presenter, state machine, revision и refresh protocol.
-- [ ] Независимо проверить runtime validation, authorization, XSS, CSP, local assets и отсутствие сети.
-- [ ] Независимо проверить accessibility, keyboard, focus, tooltip и screen-reader semantics.
-- [ ] Независимо проверить tests, negative cases, concurrency и 1000-session invariants.
-- [ ] Независимо проверить themes/contrast/color/size/motion/scroll contracts.
+- [x] Независимо проверить трассировку требований и отсутствие scope creep.
+- [x] Независимо проверить read-only/metadata-only backend и security residuals Step 1.
+- [x] Независимо проверить presenter, state machine, revision и refresh protocol.
+- [x] Независимо проверить runtime validation, authorization, XSS, CSP, local assets и отсутствие сети.
+- [x] Независимо проверить accessibility, keyboard, focus, tooltip и screen-reader semantics.
+- [x] Независимо проверить tests, negative cases, concurrency и 1000-session invariants.
+- [x] Независимо проверить themes/contrast/color/size/motion/scroll contracts.
 - [ ] После M8 независимо проверить exact package contents, provenance и installed smoke.
 
 Каждый отчёт в `reviews/` содержит source commit, при наличии VSIX path/SHA-256, severity, evidence и disposition. После каждого исправления выполняются targeted test и targeted re-review затронутой области плюс зависимые regressions. Исправление создаёт новый source commit; если изменился production/package input, прежний VSIX и зависящее от него evidence аннулируются, M8 повторяется.
@@ -215,9 +215,9 @@ Gate M7: цикл повторяется до `Blocker=0`, `High=0`; кажды�
 Зависимости: зелёный M6 и текущий review candidate M7.
 
 - [ ] До release commit подготовить русские release notes и manifest `0.2.0`; выполнить status/diff/log, закоммитить только целевые проверенные файлы.
-- [ ] Обновить build до exact outputs: `build/extension.js`, `build/kiloDataWorker.js`, `build/webview/webview.js`, `build/webview/webview.css`. Source maps и demo assets не генерировать для package.
-- [ ] Обновить положительный `files` allow-list и exact verifier для полного списка entries, identity/version/target/engine, Webview contribution, CSP assets и SHA-256 каждого build output.
-- [ ] Добавить negative verifier tests: лишний, отсутствующий и stale/mutated asset должны отклоняться.
+- [x] Обновить build до exact outputs: `build/extension.js`, `build/kiloDataWorker.js`, `build/webview/webview.js`, `build/webview/webview.css`. Source maps и demo assets не генерировать для package.
+- [x] Обновить положительный `files` allow-list и exact verifier для полного списка entries, identity/version/target/engine, Webview contribution, CSP assets и SHA-256 каждого build output.
+- [x] Добавить negative verifier tests: лишний, отсутствующий, stale/mutated asset и неверный Node engine должны отклоняться.
 - [ ] Из чистого checkout выполнить два независимых цикла `npm ci` → `npm run clean` → full test → `npm run package`; оба раза получить байт-в-байт одинаковый `dist/kilo-hub-0.2.0-win32-x64.vsix`.
 - [ ] Exact archive не содержит `tests/`, fixtures, `req/`, `reviews/`, `old_donotuse/`, demo themes/HTML/JS, source maps, DB/WAL/SHM, `node_modules/` и лишние исходники.
 - [ ] Запустить exact verifier до любой установки и записать path, bytes и SHA-256.
