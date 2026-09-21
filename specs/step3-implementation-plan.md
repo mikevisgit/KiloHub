@@ -5,7 +5,7 @@ Scope: `req/step3/01-requirements.md`; приёмка: `req/step3/02-acceptance.
 ## A. Discovery
 
 - [x] По решению пользователя актуализировать `agents.md` до фиксации нормативного пакета: Step 3 scope, read-only Kilo, ограниченный user-text runtime после Gate A, синтетический discovery.
-- [ ] Зафиксировать правила и нормативный пакет отдельным commit до дальнейшего исследования.
+- [x] Зафиксировать правила и нормативный пакет отдельным commit до дальнейшего исследования: `3bced9a`.
 - [x] Записать решения пользователя в ТЗ.
 - [x] Сохранить предварительное source evidence в `docs/step3-discovery.md`.
 - [ ] Подтвердить schema/projection/change tracking синтетическими fixtures без чтения личной переписки.
