@@ -1,0 +1,9 @@
+{
+  "name": "hub-storage-probe",
+  "publisher": "synthetic-discovery",
+  "version": "0.0.1",
+  "engines": { "vscode": "^1.105.1" },
+  "main": "./extension.cjs",
+  "extensionKind": ["ui"],
+  "activationEvents": ["onStartupFinished"]
+}

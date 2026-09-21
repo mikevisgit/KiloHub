@@ -8,12 +8,19 @@ Scope: `req/step3/01-requirements.md`; приёмка: `req/step3/02-acceptance.
 - [x] Зафиксировать правила и нормативный пакет отдельным commit до дальнейшего исследования: `3bced9a`.
 - [x] Записать решения пользователя в ТЗ.
 - [x] Сохранить предварительное source evidence в `docs/step3-discovery.md`.
-- [ ] Подтвердить schema/projection/change tracking синтетическими fixtures без чтения личной переписки.
-- [ ] Измерить поиск подстрок/коротких запросов и runtime minimum/current VS Code.
-- [ ] Проверить storage scope, writer/activation/source identity/recovery и установить измеряемые budgets/SLA свежести.
-- [ ] Согласовать итоговый стек с пользователем и записать решение.
+- [x] Выполнить первый synthetic discovery цикл: 42 search cases/345 assertions на bundled minimum/current, 9 sync cases на трёх runtime; результаты и ограничения записаны в discovery.
+- [x] Выполнить второй цикл: disk/WAL поиск (45 cases/450 oracle comparisons/24 invalid-reset), source ambiguity guard (8 checks), реальные Extension Host startup/profile probes на minimum/current. Scope и ограничения в discovery.
+- [x] Выполнить третий цикл: multi-process SQL fencing, OS pipe ownership, extraction реального synthetic JSON с NUL/длинными полями. Evidence в `docs/step3-writer-design.md` и discovery.
+- [x] Подтвердить schema/projection/change tracking синтетическими fixtures без чтения личной переписки: DB-06/09 probes, WAL/snapshot/delete/archive/reset.
+- [x] Измерить поиск подстрок от 3 символов в каждом токене и runtime minimum/current VS Code; запросы с токенами 1–2 символа отвергать без обращения к индексу.
+- [x] Проверить primitives storage scope/writer/activation/source identity/recovery; бюджеты и границы зафиксированы в `docs/step3-resource-policy.md`. Production recovery/lifecycle проверяются в B.
+- [x] Согласовать итоговый стек с пользователем и записать решение: 21 сентября 2026 года, SQLite + встроенный node:sqlite + Worker Threads + FTS5 trigram с точным instr. Без молчаливого импорта нового формата; неоднозначный источник обрабатывается как несовместимый по DB-09.
 
 Gate A: доказательства и ограничения записаны, механизм сверки и бюджеты определены, стек согласован. Наличие event_sequence не объявляется гарантией полного журнала.
+
+Согласованный проектный контракт между фазами B/C: база и тексты остаются в worker; host получает только metadata, состояние полноты/ошибки и результаты поиска в виде идентификаторов папок с rank. API фонового сервиса должен публиковать snapshot/revision независимо от открытого Webview. Поисковые ответы привязаны к generation запроса и revision индекса; пересылка реплик в Webview запрещена. Точный TypeScript API закрепляется при реализации B, а не подменяется чтением полного корпуса в host.
+
+Обязательные integration invariants B: provider.refresh() не используется как scheduler, поскольку старый метод раскрывает Webview. Health/completeness сохраняются при пересчёте текущей папки. Публикация metadata и domain references атомарна и защищена generation после await; старый final action guard инвалидируется новым snapshot. Ограничения старого metadata reader не являются пределом индекса, а предел одного DTO не должен усекать весь пользовательский корпус. Диагностика text importer передаётся allow-listed кодами без raw exception/message/stack с текстом. Изменённые требования activation/refresh в тестах заменяются, остальные baseline-инварианты сохраняются.
 
 ## B. Собственная база и синхронизация
 
@@ -45,4 +52,4 @@ Gate C: матрица поиска и UI пройдена; нет открыт�
 - [ ] Индексация/поиск без Node/npm в системе.
 - [ ] Evidence/commit/path/hash/размер/ограничения в handoff и пользовательская визуальная приёмка.
 
-Статус: A частично выполнен (исследование исходников); B–D не начаты. Production `0.2.3` в рамках подготовки ТЗ не изменяется.
+Статус: Gate A завершён для начала реализации. Стек согласован, DB-09 действует; row-scaled admission и fail-safe ресурсы определены по SYNC-05 без скрытого ограничения истории. Прежний блокер fixed-small bound снят как избыточная трактовка ТЗ, не как новая гарантия native memory. B начинается; C/D остаются закрыты до проверок B.

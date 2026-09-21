@@ -1,0 +1,51 @@
+import assert from 'node:assert/strict';
+import process from 'node:process';
+import console from 'node:console';
+import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { runTests } from '@vscode/test-electron';
+import { prepareIsolatedTestHost } from '../../scripts/isolated-test-host.mjs';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const version = process.argv[2];
+assert.ok(['1.105.1', '1.138.0'].includes(version));
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '1';
+const root = await mkdtemp(path.join(os.tmpdir(), 'hub-profile-discovery-'));
+const probe = path.join(here, 'profile-probe');
+const testHost = await prepareIsolatedTestHost(version);
+const env = { ...process.env, HUB_PROBE_ROOT: root };
+delete env.ELECTRON_RUN_AS_NODE;
+delete process.env.ELECTRON_RUN_AS_NODE;
+try {
+  const results = [];
+  for (const [data, profile] of [['a', 'Default'], ['a', 'Discovery A'], ['a', 'Discovery B'], ['b', 'Default']]) {
+    const workspace = path.join(root, `workspace-${results.length}`);
+    await mkdir(workspace);
+    await runTests({
+      vscodeExecutablePath: testHost.vscodeExecutablePath,
+      extensionDevelopmentPath: probe,
+      extensionTestsPath: path.join(probe, 'host-test.cjs'),
+      extensionTestsEnv: env,
+      launchArgs: [workspace, '--user-data-dir', path.join(root, data),
+        '--extensions-dir', path.join(root, 'extensions'), '--profile', profile,
+        '--disable-extensions', '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes'],
+      reuseMachineInstall: false,
+    });
+    results.push({ data, profile, ...JSON.parse(await readFile(path.join(root, 'result.json'), 'utf8')) });
+  }
+  assert.equal(results[0].previous, null);
+  for (const result of results.slice(1, 3)) {
+    assert.equal(result.storage, results[0].storage);
+    assert.equal(result.previous, 'synthetic-discovery-only');
+  }
+  assert.notEqual(results[3].storage, results[0].storage);
+  assert.equal(results[3].previous, null);
+  console.log(JSON.stringify({ version, checks: 'PASS startup, profiles share storage, user-data roots isolated',
+    results: results.map(({ storage, ...rest }) => ({ ...rest, storage: path.relative(root, storage) })),
+    limits: 'sequential windows; no simultaneous writer or shutdown/crash proof' }, null, 2));
+} finally {
+  await testHost.restore();
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+}
