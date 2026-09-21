@@ -24,12 +24,12 @@ Gate A: доказательства и ограничения записаны,
 
 ## B. Собственная база и синхронизация
 
-- [ ] Развести read-only source и writable Hub storage, guards/migrations и worker lifecycle.
-- [ ] Initial import всей допустимой истории порциями с durable progress.
-- [ ] Изменения, reconciliation, delete/archive, retry/backoff, source replacement.
-- [ ] Multi-window writer, crash recovery, rebuild и privacy-safe Output.
-- [ ] Подключить список к Hub projection; заменить Refresh автоматическим обновлением.
-- [ ] Проверить DB/SYNC/SEC и провести независимое review до поиска.
+- [x] Развести read-only source и writable Hub storage, guards/migrations и worker lifecycle.
+- [x] Initial import всей допустимой истории порциями с durable progress.
+- [x] Изменения, reconciliation, delete/archive, retry/backoff, source replacement.
+- [x] Multi-window writer, crash recovery распознанных поколений, rebuild и privacy-safe Output; неизвестный coordination format остаётся fail-closed, не перезаписывается автоматически.
+- [x] Подключить список к Hub projection; заменить Refresh автоматическим обновлением.
+- [x] Проверить DB/SYNC/SEC и провести независимое review до поиска: 83 unit/29 component/minimum host, дополнительные 10 cases на каждом bundled runtime; 2 High/1 Medium исправлены и перепроверены.
 
 Gate B: индекс достоверен и восстанавливаем; источник не изменяется; last-good сохранён при сбоях; фон работает без открытой панели и системного Node.
 
@@ -52,4 +52,4 @@ Gate C: матрица поиска и UI пройдена; нет открыт�
 - [ ] Индексация/поиск без Node/npm в системе.
 - [ ] Evidence/commit/path/hash/размер/ограничения в handoff и пользовательская визуальная приёмка.
 
-Статус: Gate A завершён для начала реализации. Стек согласован, DB-09 действует; row-scaled admission и fail-safe ресурсы определены по SYNC-05 без скрытого ограничения истории. Прежний блокер fixed-small bound снят как избыточная трактовка ТЗ, не как новая гарантия native memory. B начинается; C/D остаются закрыты до проверок B.
+Статус: Gate A/B пройдены для начала C. Стек согласован, DB-09 действует; row-scaled admission не является гарантией native memory isolation. Нераспознанные control files fail-closed без разрушительного ремонта. C начинается; окончательные production-scale, installed/no-system-tools и release проверки остаются обязательными в C/D.

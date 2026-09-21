@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { runTests, runVSCodeCommand } from '@vscode/test-electron';
 
 import { prepareIsolatedTestHost } from './isolated-test-host.mjs';
+import { withRestrictedToolPath } from './restricted-test-env.mjs';
+
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '1';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(await readFile(path.join(repositoryRoot, 'package.json'), 'utf8'));
@@ -46,6 +49,19 @@ if (verification.status !== 0) {
 await rm(smokeRoot, { force: true, recursive: true });
 delete process.env.ELECTRON_RUN_AS_NODE;
 
+// Startup must never resolve the personal source before the test creates its fixture.
+const runtimeEnvironment = {
+  ...process.env,
+  KILO_DB: path.join(smokeRoot, 'synthetic-source-not-created.sqlite'),
+  KILO_HUB_SYNTHETIC_TEST: '1',
+  KILO_HUB_NO_EXTERNAL_TOOLS: '1',
+  NODE_TLS_REJECT_UNAUTHORIZED: '1',
+};
+for (const key of Object.keys(runtimeEnvironment)) {
+  if (key.toLowerCase() === 'path') delete runtimeEnvironment[key];
+}
+runtimeEnvironment.Path = `${process.env.SystemRoot}\\System32;${process.env.SystemRoot}`;
+
 const testHost = await prepareIsolatedTestHost(version);
 try {
   await runVSCodeCommand([
@@ -69,7 +85,7 @@ try {
     throw new Error(`Installed extension was not listed: ${expectedExtension}`);
   }
 
-  await runTests({
+  await withRestrictedToolPath(() => runTests({
     vscodeExecutablePath: testHost.vscodeExecutablePath,
     extensionDevelopmentPath: path.join(repositoryRoot, 'tests', 'fixtures', 'harness-extension'),
     extensionTestsPath: path.join(repositoryRoot, 'build-tests', 'tests', 'integration', 'index.js'),
@@ -78,14 +94,14 @@ try {
       ...profileArguments,
     ],
     extensionTestsEnv: {
-      ...process.env,
+      ...runtimeEnvironment,
       ...(version === '1.105.1' ? {
         KILO_HUB_EXPECTED_NODE: '22.19.0',
         KILO_HUB_EXPECTED_ELECTRON: '37.6.0',
       } : {}),
     },
     reuseMachineInstall: false,
-  });
+  }));
 } finally {
   await testHost.restore();
 }

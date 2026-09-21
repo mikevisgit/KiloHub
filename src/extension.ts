@@ -5,17 +5,22 @@ import {
   registerKiloHubCommands,
 } from './commands.js';
 import type { WorkspaceDescriptor } from './currentFolder.js';
-import { formatDiagnosticWarning, sanitizeDiagnostic } from './diagnostics.js';
+import { sanitizeDiagnostic } from './diagnostics.js';
 import {
   KILO_HUB_VIEW_ID,
   KiloHubWebviewProvider,
 } from './kiloHubWebviewProvider.js';
-import { readKiloSessions } from './kiloDataSource.js';
-import { projectSessions } from './projection.js';
+import { HubIndexService } from './hubIndexService.js';
+import type { HubIndexSnapshot } from './hubIndexProtocol.js';
 import { isAvailableLocalDirectory } from './windowsPathSafety.js';
 
 const OUTPUT_NAME = 'Kilo Hub';
-const PLATFORM_ERROR = 'Kilo Hub Step 2 поддерживает только локальный Windows Extension Host.';
+let activeIndex: HubIndexService | undefined;
+
+export async function deactivate(): Promise<void> {
+  await activeIndex?.stop();
+  activeIndex = undefined;
+}
 
 function installedKiloVersion(): string | undefined {
   const extension = vscode.extensions.getExtension('kilocode.kilo-code') as unknown as
@@ -45,35 +50,17 @@ async function describeWorkspace(): Promise<WorkspaceDescriptor> {
   };
 }
 
-export function activate(context: vscode.ExtensionContext): void {
+export function activate(context: vscode.ExtensionContext): { getIndexSnapshot(): HubIndexSnapshot } {
   const output = vscode.window.createOutputChannel(OUTPUT_NAME);
-  let warningCount = 0;
-  const logWarning = (source: string, message: string): void => {
-    if (warningCount < 100) {
-      output.appendLine(formatDiagnosticWarning(source, message));
-    } else if (warningCount === 100) {
-      output.appendLine('[warning] Дополнительные предупреждения refresh подавлены.');
-    }
-    warningCount += 1;
-  };
+  const index = new HubIndexService(context.globalStorageUri.fsPath, installedKiloVersion(),
+    (code) => output.appendLine(`[index] ${code}`), context.extensionMode === vscode.ExtensionMode.Test);
+  activeIndex = index;
 
   const provider = new KiloHubWebviewProvider({
     extensionUri: context.extensionUri,
     output,
-    loadFolders: async () => {
-      warningCount = 0;
-      if (process.platform !== 'win32') {
-        throw new Error(PLATFORM_ERROR);
-      }
-      const sessions = await readKiloSessions({
-        kiloVersion: installedKiloVersion(),
-        onWarning: (message) => logWarning('adapter', message),
-      });
-      return projectSessions(sessions, {
-        isDirectoryAvailable: (path) => isAvailableLocalDirectory(path),
-        onWarning: (message) => logWarning('projection', message),
-      });
-    },
+    index,
+    loadFolders: () => Promise.resolve(index.snapshot.folders),
     workspaceDescriptor: describeWorkspace,
     executeAction: (action, folder) => executeFolderAction(action, folder, output),
   });
@@ -95,9 +82,12 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     output,
+    index,
     provider,
     viewRegistration,
     workspaceSubscription,
     ...commandSubscriptions,
   );
+  index.start();
+  return { getIndexSnapshot: () => index.snapshot };
 }

@@ -75,7 +75,6 @@ type RgbColor = readonly [number, number, number];
 type RgbaColor = readonly [number, number, number, number];
 
 const INFO_LABEL = 'Здесь собраны папки, в которых вы работали с Kilo. Чтобы вернуться к работе, выберите папку и откройте её.';
-const REFRESH_LABEL = 'Обновить список папок и диалогов из Kilo';
 const UNKNOWN_DATE = 'Дата неизвестна';
 const DAY_MILLISECONDS = 86_400_000;
 const RENDER_CHUNK_SIZE = 50;
@@ -453,12 +452,7 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
   info.textContent = 'ⓘ';
   info.setAttribute('aria-label', INFO_LABEL);
   info.dataset.key = semanticKey('info');
-  const refresh = createElement(document, 'button', 'icon-button refresh');
-  refresh.type = 'button';
-  refresh.textContent = '↻';
-  refresh.setAttribute('aria-label', REFRESH_LABEL);
-  refresh.dataset.key = semanticKey('refresh');
-  intro.append(title, info, refresh);
+  intro.append(title, info);
 
   const status = createElement(document, 'p', 'view-status');
   status.setAttribute('role', 'status');
@@ -726,7 +720,7 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
         }
       }
     }
-    refresh.focus({ preventScroll: true });
+    info.focus({ preventScroll: true });
   }
 
   function yieldRender(): Promise<void> {
@@ -806,7 +800,6 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
     const generation = ++renderGeneration;
     status.textContent = value.message ?? '';
     hub.setAttribute('aria-busy', String(value.busy));
-    refresh.disabled = value.busy;
     void renderState(value, generation, restoredScrollTop).then((completed) => {
       if (completed && renderIsCurrent(generation)) persist();
     });
@@ -849,10 +842,6 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
     if (applied) restoredScrollTop = undefined;
   };
   const onScroll = (): void => persist();
-  const onRefresh = (): void => {
-    if (hostState?.busy === true) return;
-    vscode.postMessage({ type: 'refresh', version: PROTOCOL_VERSION });
-  };
   const onFocus = (): void => {
     updateDates();
     updateTheme();
@@ -865,7 +854,6 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
   environment.addEventListener('focus', onFocus);
   document.addEventListener('visibilitychange', onVisibilityChange);
   folders.addEventListener('scroll', onScroll);
-  refresh.addEventListener('click', onRefresh);
 
   const MutationObserverConstructor = (environment as Window & typeof globalThis).MutationObserver;
   const themeObserver = new MutationObserverConstructor(updateTheme);
@@ -902,7 +890,6 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
       environment.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       folders.removeEventListener('scroll', onScroll);
-      refresh.removeEventListener('click', onRefresh);
       accordionController?.dispose();
       for (const view of folderViews.values()) disposeFolderView(view);
       tooltipController.dispose();

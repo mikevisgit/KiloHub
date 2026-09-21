@@ -311,12 +311,12 @@ void test('renders the exact current/missing action matrix and posts current rev
   }
 });
 
-void test('shows every load state and disables refresh while busy', async () => {
+void test('shows every background state without a manual refresh button', async () => {
   const harness = await setup();
   try {
     const refresh = harness.document.querySelector<HTMLButtonElement>('.refresh');
     const status = harness.document.querySelector<HTMLElement>('.view-status');
-    assert.ok(refresh);
+    assert.equal(refresh, null);
     assert.ok(status);
     harness.send({
       version: PROTOCOL_VERSION,
@@ -327,15 +327,11 @@ void test('shows every load state and disables refresh while busy', async () => 
       busy: true,
     });
     assert.equal(status.textContent, WEBVIEW_STATE_MESSAGES.loading);
-    assert.equal(refresh.disabled, true);
-    refresh.click();
     assert.equal(harness.api.messages.length, 1);
 
     harness.send(ready(2, []));
     assert.equal(status.textContent, WEBVIEW_STATE_MESSAGES.empty);
-    assert.equal(refresh.disabled, false);
-    refresh.click();
-    assert.deepEqual(harness.api.messages.at(-1), { type: 'refresh', version: PROTOCOL_VERSION });
+    assert.equal(harness.api.messages.length, 1);
 
     harness.send({
       version: PROTOCOL_VERSION,
@@ -489,7 +485,7 @@ void test('browser date labels cover canonical boundaries, plural forms, leap da
   );
 });
 
-void test('restores removed action focus to its folder, then nearest folder and refresh', async () => {
+void test('restores removed action focus to its folder, then nearest folder and info', async () => {
   const first = folder({ id: 'first', name: 'First', path: 'C:\\First' });
   const second = folder({ id: 'second', name: 'Second', path: 'C:\\Second' });
   const third = folder({ id: 'third', name: 'Third', path: 'C:\\Third' });
@@ -519,7 +515,7 @@ void test('restores removed action focus to its folder, then nearest folder and 
 
     (folderElement(harness.document, 'third').querySelector('.folder-head') as HTMLButtonElement).focus();
     harness.send(ready(4, []));
-    assert.equal(harness.document.activeElement, harness.document.querySelector('.refresh'));
+    assert.equal(harness.document.activeElement, harness.document.querySelector('.info'));
   } finally {
     harness.dispose();
   }
@@ -545,7 +541,7 @@ void test('renders 1000 folders in cancelable chunks with busy state before the 
     const hub = harness.document.querySelector<HTMLElement>('.hub');
     const refresh = harness.document.querySelector<HTMLButtonElement>('.refresh');
     assert.equal(hub?.getAttribute('aria-busy'), 'true');
-    assert.equal(refresh?.disabled, true);
+    assert.equal(refresh, null);
     assert.equal(harness.document.querySelector('.view-status')?.textContent, WEBVIEW_STATE_MESSAGES.refreshing);
     assert.equal(harness.document.querySelectorAll('.folder').length, 0);
 
@@ -618,11 +614,10 @@ void test('recomputes nonce stylesheet badge variables on theme mutation without
     const name = harness.document.querySelector<HTMLElement>('.folder-name');
     const header = harness.document.querySelector<HTMLElement>('.folder-head');
     assert.ok(info);
-    assert.ok(refresh);
+    assert.equal(refresh, null);
     assert.ok(name);
     assert.ok(header);
     assert.equal(info.hasAttribute('aria-describedby'), false);
-    assert.equal(refresh.hasAttribute('aria-describedby'), false);
     assert.equal(harness.document.querySelector('.action')?.hasAttribute('aria-describedby'), false);
     assert.equal(harness.document.querySelectorAll('[role="tooltip"]').length, 1);
     const tooltipId = header.getAttribute('aria-describedby');

@@ -11,12 +11,15 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { pathToFileURL } from 'node:url';
 
 import * as vscode from 'vscode';
 
 import { openFolderOptions } from '../../src/commands.js';
 import type { FolderAction } from '../../src/commands.js';
 import { KiloHubWebviewProvider } from '../../src/kiloHubWebviewProvider.js';
+import { HubIndexService } from '../../src/hubIndexService.js';
+import type { HubIndexSnapshot } from '../../src/hubIndexProtocol.js';
 import type { KiloFolder } from '../../src/types.js';
 import { PROTOCOL_VERSION } from '../../src/webviewProtocol.js';
 
@@ -86,6 +89,8 @@ function createFixture(databasePath: string, workspacePath: string): void {
       time_updated INTEGER NOT NULL,
       time_archived INTEGER
     )`);
+    database.exec(`CREATE TABLE message(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,data TEXT NOT NULL);
+      CREATE TABLE part(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,message_id TEXT NOT NULL,data TEXT NOT NULL);`);
     const insert = database.prepare(`INSERT INTO session (
       id, title, directory, parent_id, time_created, time_updated, time_archived
     ) VALUES (?, ?, ?, ?, ?, ?, ?)`);
@@ -358,27 +363,47 @@ async function testHostProviderContract(repositoryRoot: string): Promise<void> {
   }
 }
 
-async function testRefreshRequiresResolvedWebview(repositoryRoot: string): Promise<void> {
+async function testBackgroundSnapshotsWithoutWebview(repositoryRoot: string): Promise<void> {
   let reads = 0;
+  let polls = 0;
+  let listener: ((snapshot: HubIndexSnapshot) => void) | undefined;
+  const snapshot: HubIndexSnapshot = { generation: 'fixture-generation', indexRevision: 1,
+    complete: true, health: 'ready', folders: [{ id: 'c:\\project', path: 'C:\\Project',
+      uri: 'file:///C:/Project', name: 'Project', available: true, conversations: [] }] };
+  let pending: Deferred<{
+    folderCount: 0; path: null; scheme: null; authority: null; workspaceFile: null; remote: false;
+  }> | undefined;
+  const workspace = { folderCount: 0, path: null, scheme: null, authority: null, workspaceFile: null, remote: false } as const;
   const provider = new KiloHubWebviewProvider({
     extensionUri: vscode.Uri.file(repositoryRoot),
     output: { appendLine: () => undefined } as unknown as vscode.OutputChannel,
     loadFolders: () => { reads += 1; return Promise.resolve([]); },
-    workspaceDescriptor: () => Promise.resolve({
-      folderCount: 0,
-      path: null,
-      scheme: null,
-      authority: null,
-      workspaceFile: null,
-      remote: false,
-    }),
+    workspaceDescriptor: () => { const next = pending; pending = undefined; return next?.promise ?? Promise.resolve(workspace); },
+    index: { subscribe: (next) => { listener = next; next(snapshot); return { dispose: () => { listener = undefined; } }; },
+      poll: () => { polls += 1; } },
     executeAction: () => Promise.resolve(),
     revealView: () => Promise.resolve(),
     browserReadyTimeoutMs: 20,
   });
   try {
-    await assert.rejects(provider.refresh(), /не был создан/u);
+    await waitUntil(() => provider.currentState.kind === 'ready');
+    await provider.refresh();
+    assert.equal(polls, 1);
     assert.equal(reads, 0);
+    assert.equal(provider.currentState.folders.length, 1);
+    listener?.({ ...snapshot, complete: false, health: 'stale', diagnostic: 'source-ambiguous' });
+    await waitUntil(() => provider.currentState.kind === 'refreshError');
+    await provider.workspaceChanged();
+    assert.equal(provider.currentState.kind, 'refreshError');
+    const delayed = deferred<typeof workspace>();
+    pending = delayed;
+    listener?.({ ...snapshot, folders: [] });
+    listener?.({ ...snapshot, complete: false, health: 'stale' });
+    await waitUntil(() => provider.currentState.kind === 'refreshError');
+    delayed.resolve(workspace);
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 10));
+    assert.equal(provider.currentState.folders.length, 1);
+    assert.equal(provider.currentState.kind, 'refreshError');
   } finally {
     provider.dispose();
   }
@@ -405,7 +430,7 @@ export async function run(): Promise<void> {
   const repositoryRoot = resolve(__dirname, '..', '..', '..');
   assert.equal(existsSync(join(repositoryRoot, 'build', 'webview', 'webview.js')), true);
   assert.equal(existsSync(join(repositoryRoot, 'build', 'webview', 'webview.css')), true);
-  await testRefreshRequiresResolvedWebview(repositoryRoot);
+  await testBackgroundSnapshotsWithoutWebview(repositoryRoot);
   await testHostProviderContract(repositoryRoot);
 
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'kilo-hub-extension-'));
@@ -414,23 +439,33 @@ export async function run(): Promise<void> {
   createFixture(databasePath, workspacePath);
   const before = fingerprintDirectory(fixtureRoot);
   process.env.KILO_DB = databasePath;
+  process.env.KILO_HUB_SYNTHETIC_TEST = '1';
 
   try {
     const extension = vscode.extensions.getExtension(EXTENSION_ID);
     assert.ok(extension);
-    assert.equal(extension.isActive, false);
     assertManifest(extension.packageJSON);
     const manifest = extension.packageJSON;
     assert.equal(manifest.version, '0.2.3');
     assert.equal(manifest.icon, 'resources/kilo-hub.png');
-    assert.deepEqual(sorted(manifest.activationEvents), sorted(['onCommand:kiloHub.refresh', 'onView:kiloHub.folders']));
+    assert.deepEqual(sorted(manifest.activationEvents), sorted(['onStartupFinished', 'onCommand:kiloHub.refresh', 'onView:kiloHub.folders']));
     assert.deepEqual(sorted(manifest.contributes.commands.map(({ command }) => command)), sorted(COMMAND_IDS));
     assert.equal(manifest.contributes.viewsContainers.activitybar.length, 1);
     assert.equal(manifest.contributes.viewsContainers.activitybar[0].id, VIEW_CONTAINER_ID);
     assert.deepEqual(manifest.contributes.views[VIEW_CONTAINER_ID], [{ id: VIEW_ID, name: 'Kilo Hub', type: 'webview', visibility: 'visible' }]);
     assert.equal(manifest.contributes.menus?.['view/title'], undefined);
 
-    await vscode.commands.executeCommand(`workbench.view.extension.${VIEW_CONTAINER_ID}`);
+    // A real managed Worker imports this synthetic database without resolving any Webview.
+    const service = new HubIndexService(join(fixtureRoot, 'hub'), undefined, undefined, true);
+    try {
+      service.start();
+      await waitUntil(() => service.snapshot.complete || service.snapshot.diagnostic !== undefined, 10_000);
+      assert.equal(service.snapshot.complete, true);
+      assert.equal(service.snapshot.folders.length, 1);
+    } finally { await service.stop(); }
+    const api = await extension.activate() as { getIndexSnapshot(): HubIndexSnapshot };
+    await waitUntil(() => api.getIndexSnapshot().complete, 20_000);
+    assert.equal(api.getIndexSnapshot().folders.length, 1);
     await vscode.commands.executeCommand('kiloHub.refresh');
     assert.equal(extension.isActive, true);
     const productCommands = (await vscode.commands.getCommands(true)).filter((id) => COMMAND_IDS.includes(id as typeof COMMAND_IDS[number]));
@@ -439,7 +474,11 @@ export async function run(): Promise<void> {
     assert.deepEqual(openFolderOptions('here'), { forceReuseWindow: true });
     assert.deepEqual(openFolderOptions('newWindow'), { forceNewWindow: true });
   } finally {
+    const lifecycle = await import(pathToFileURL(join(repositoryRoot, 'build', 'extension.js')).href) as { deactivate(): Promise<void> };
+    await lifecycle.deactivate();
     delete process.env.KILO_DB;
+    delete process.env.KILO_HUB_SYNTHETIC_TEST;
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
     rmSync(fixtureRoot, { force: true, recursive: true });
   }
 }

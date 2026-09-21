@@ -99,6 +99,10 @@ Runtime-проверка ещё pending: изолированные Default/A/B 
 
 Закрыты вопросы startup activation без панели и фактического совместного storage профилей. **Не закрыты** одновременная работа нескольких hosts, writer takeover и shutdown/crash; последовательные окна этого не доказывают. Тестовая development extension не является установленным Step 3 artifact.
 
+Последующее усиление runner: `--without-node` оставляет в PATH только Windows/System32, проверяет ENOENT при попытке запуска node/npm/sqlite3/kilo, затем выполняет FTS5-запрос в настоящем Extension Host. Minimum и current прошли все четыре profile/root запуска. Это доказательство независимости probe от внешних команд, не утверждение об удалении Node.js с машины и не замена installed Step 3 smoke.
+
+`tests/discovery/step3-pipe-worker.cjs`: 4/4 на обоих bundled runtime; Worker Threads одного процесса не могут одновременно владеть pipe, await terminate владельца освобождает pipe для successor, следующий конкурент снова получает EADDRINUSE. Это дополняет process-death proof и не утверждает возможность немедленного прерывания активного SQLite вызова.
+
 ## Синтетический поиск: измерения
 
 Последующее решение пользователя: в production искать только токены длиной от 3 Unicode code points; запрос с более коротким токеном отклоняется целиком до поиска. Приведённые ниже измерения коротких запросов и fallback сохраняются как историческое исследование, **не требование реализации**. Discovery-probe сравнивает низкоуровневые возможности, а не новый UI/host validation contract; fallback специально для 1–2 символов больше не нужен.

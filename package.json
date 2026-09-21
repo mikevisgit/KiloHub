@@ -20,6 +20,7 @@
   ],
   "main": "./build/extension.js",
   "activationEvents": [
+    "onStartupFinished",
     "onView:kiloHub.folders",
     "onCommand:kiloHub.refresh"
   ],
@@ -71,6 +72,10 @@
     ],
     "menus": {
       "commandPalette": [
+        {
+          "command": "kiloHub.refresh",
+          "when": "false"
+        },
         {
           "command": "kiloHub.openHere",
           "when": "false"

@@ -146,7 +146,7 @@ export function resolveKiloDatabasePath(options: KiloDatabaseResolverOptions = {
   return resolveRelativeDatabasePath(override, kiloDataDirectory);
 }
 
-function assertSupportedKiloVersion(version: string | undefined): void {
+export function assertSupportedKiloVersion(version: string | undefined): void {
   if (version === undefined) {
     return;
   }
@@ -201,7 +201,7 @@ function readSessionColumns(database: DatabaseSync): SessionColumnInfo[] {
   ));
 }
 
-function assertCompatibleSchema(database: DatabaseSync): void {
+export function assertCompatibleSchema(database: DatabaseSync): void {
   const objects = database.prepare(
     "SELECT type FROM sqlite_schema WHERE name = 'session' COLLATE BINARY",
   ).all() as Array<Record<string, unknown>>;

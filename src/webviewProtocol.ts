@@ -13,11 +13,11 @@ export const WEBVIEW_PROTOCOL_LIMITS = Object.freeze({
 });
 
 export const WEBVIEW_STATE_MESSAGES = Object.freeze({
-  loading: 'Загружаем папки…',
+  loading: 'Подготавливаем поиск…',
   empty: 'Здесь пока нет папок с диалогами Kilo',
-  refreshing: 'Обновляем список…',
-  initialError: 'Не удалось загрузить папки. Попробуйте обновить список',
-  refreshError: 'Не удалось обновить список. Показаны ранее загруженные данные',
+  refreshing: 'Подготавливаем поиск…',
+  initialError: 'Не удалось обновить данные. Повторим автоматически',
+  refreshError: 'Не удалось обновить данные. Повторим автоматически',
 });
 
 export interface HubConversationDto {

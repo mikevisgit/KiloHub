@@ -5,7 +5,7 @@ await rm('build', { force: true, recursive: true });
 await mkdir('build', { recursive: true });
 await Promise.all([
   build({
-    entryPoints: ['src/extension.ts', 'src/kiloDataWorker.ts'],
+    entryPoints: ['src/extension.ts', 'src/kiloDataWorker.ts', 'src/hubIndexWorker.ts'],
     bundle: true,
     platform: 'node',
     format: 'cjs',
