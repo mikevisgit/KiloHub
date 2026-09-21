@@ -124,3 +124,5 @@ Production удаляет `tabindex`/tooltip registration заголовка и�
 Targeted проверки после исправлений: component `29/29`, TypeScript, ESLint и `git diff --check` — PASS. Требуется повторное независимое review и затем полный release gate.
 
 Повторное review сначала выявило только два нормативных рассогласования geometry/package, после синхронизации канонического ТЗ, размерной спецификации, manual checklist и test matrix финальный результат: `Blocker 0 / High 0 / Medium 0 / Low 0`, verdict `SOURCE REVIEW APPROVED`. Все behavioral findings остаются закрыты; release gate выполняется на одном source commit `0.2.2`.
+
+Финальный package review артефакта `dist/kilo-hub-0.2.2-win32-x64.vsix` на source commit `3de628bf5adf310cb0c41b3ba34a0acd08091f98`: `Blocker 0 / High 0 / Medium 0 / Low 0`, verdict `PACKAGE/RELEASE APPROVED`. Проверены exact 10 entries, manifest `local.kilo-hub@0.2.2`, target/engines, bundled tooltip behavior, отсутствие запрещённых файлов, bundle hashes, reproducible ZIP timestamp и installed evidence.

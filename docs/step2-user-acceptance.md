@@ -47,3 +47,15 @@
 | Реальные folder actions | Не проверено | |
 
 Если проверка найдёт несоответствие, текущий SHA не считается пользовательски принятым: исправление должно пройти повторные automated tests, review, package, exact verifier и reinstall.
+
+## Повторная проверка `0.2.2`
+
+- Extension: `local.kilo-hub@0.2.2`.
+- VSIX: `D:\VSCode\KiloHub\dist\kilo-hub-0.2.2-win32-x64.vsix`.
+- SHA-256: `A30F07223BFAADC49396B5C229429C7D636C069A288B440D9A94AA2C2EAB5986`.
+- Source commit: `3de628bf5adf310cb0c41b3ba34a0acd08091f98`.
+- Package/runtime/review: пройдено, `0/0/0/0`.
+- Основной VS Code `1.138.0`: установлен `local.kilo-hub@0.2.2`.
+- Визуальная приёмка: ожидается после финального `Developer: Reload Window`.
+
+Проверить, что у `Последние диалоги` и отдельных названий диалогов нет tooltip. Для полного пути, info, refresh и действий popup должен исчезать сразу при попадании курсора в его прямоугольник и не появляться снова до настоящего ухода и нового входа в source.

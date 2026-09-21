@@ -2,6 +2,21 @@
 
 > Этот документ фиксирует исторический release `0.2.0`, который позднее не прошёл пользовательскую визуальную приёмку. Исправленный `0.2.1` требует нового source commit, checksum, package review и installed evidence; результаты ниже нельзя переносить на него автоматически.
 
+## Tooltip hotfix `0.2.2`
+
+- Source commit: `3de628bf5adf310cb0c41b3ba34a0acd08091f98`.
+- Путь: `D:\VSCode\KiloHub\dist\kilo-hub-0.2.2-win32-x64.vsix`.
+- Размер: `31874` bytes.
+- SHA-256: `A30F07223BFAADC49396B5C229429C7D636C069A288B440D9A94AA2C2EAB5986`.
+- Identity: `local.kilo-hub@0.2.2`, target `win32-x64`.
+- Два независимых clean/full/package cycles: одинаковый SHA-256.
+- Unit `62/62`, component `29/29`, minimum/current development и installed Extension Host: PASS.
+- Exact verifier и четыре negative cases: PASS.
+- Source review и package review: `0/0/0/0`, APPROVED.
+- Основной профиль VS Code `1.138.0`: установка `--force` успешна, identity подтверждён.
+
+Версия удаляет tooltip заголовка истории и названий диалогов. Остальные popup имеют `pointer-events:none` и немедленно скрываются при геометрическом попадании pointer без повторного появления до leave/reentry owner.
+
 ## Итоговый артефакт
 
 - Source commit: `48d5884b2e364ccaeecc8e1e3d09baf1711c62a9`.

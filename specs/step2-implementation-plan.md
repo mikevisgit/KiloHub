@@ -265,7 +265,7 @@ Gate M10: `0.2.1` проходит M6–M8 на одном source commit/hash, �
 - [x] Зафиксировать УТЗ-09: удалить tooltip owners у заголовка истории и названий диалогов, сохранив полный title в accessibility tree.
 - [x] Сделать popup pointer-pass-through и немедленно скрывать его по координатам `pointermove` внутри или на границе прямоугольника.
 - [x] Подавлять повторный показ геометрически скрытого popup до настоящего ухода и нового входа в owner.
-- [ ] Повторить automated/review/package/install gate как отдельную версию `0.2.2`.
+- [x] Повторить automated/review/package/install gate как отдельную версию `0.2.2`.
 - [ ] Установить exact VSIX в основной VS Code и последним шагом выполнить `Developer: Reload Window`.
 
 Gate M11: source/package review не имеет findings, exact `0.2.2` воспроизводим и установлен, после чего пользователь повторяет визуальную проверку tooltip.
