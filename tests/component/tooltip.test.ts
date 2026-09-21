@@ -95,13 +95,18 @@ void test('tooltip nodes and aria descriptions remain stable while only one popu
   first.append(firstChild, secondChild);
   first.setAttribute('aria-describedby', 'existing-description');
   const second = window.document.createElement('button') as unknown as HTMLElement;
-  panel.append(first, second);
+  const descriptionTarget = window.document.createElement('button') as unknown as HTMLElement;
+  descriptionTarget.setAttribute('aria-describedby', 'existing-target-description');
+  panel.append(first, second, descriptionTarget);
 
   const controller = new TooltipController(panel, {
     environment: window as unknown as globalThis.Window,
   });
   const firstRegistration = controller.register(first, 'Первый путь');
-  const secondRegistration = controller.register(second, 'Второй путь');
+  const secondRegistration = controller.register(second, 'Второй путь', {
+    focusable: false,
+    descriptionTarget,
+  });
 
   assert.notEqual(firstRegistration.tooltip.id, secondRegistration.tooltip.id);
   assert.equal(firstRegistration.tooltip.getAttribute('role'), 'tooltip');
@@ -112,6 +117,9 @@ void test('tooltip nodes and aria descriptions remain stable while only one popu
     `existing-description ${firstRegistration.tooltip.id}`,
   );
 
+  descriptionTarget.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }) as unknown as FocusEvent);
+  second.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }) as unknown as FocusEvent);
+  assert.equal(secondRegistration.tooltip.hidden, true, 'description target and passive owner do not show on focus');
   firstChild.dispatchEvent(pointerEvent(window, 'pointerover'));
   assert.equal(firstRegistration.tooltip.hidden, false);
   assert.equal(secondRegistration.tooltip.hidden, true);
@@ -122,11 +130,16 @@ void test('tooltip nodes and aria descriptions remain stable while only one popu
   assert.equal(firstRegistration.tooltip.hidden, true);
   assert.equal(secondRegistration.tooltip.hidden, false);
   assert.equal(first.getAttribute('aria-describedby')?.includes(firstRegistration.tooltip.id), true);
+  assert.equal(
+    descriptionTarget.getAttribute('aria-describedby'),
+    `existing-target-description ${secondRegistration.tooltip.id}`,
+  );
 
   controller.dispose();
   assert.equal(panel.querySelectorAll('[role="tooltip"]').length, 0);
   assert.equal(first.getAttribute('aria-describedby'), 'existing-description');
   assert.equal(second.hasAttribute('aria-describedby'), false);
+  assert.equal(descriptionTarget.getAttribute('aria-describedby'), 'existing-target-description');
 });
 
 void test('pointer entering popup geometry hides immediately and stays dismissed until owner reentry', async () => {

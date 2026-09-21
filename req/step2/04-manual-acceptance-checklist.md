@@ -15,7 +15,7 @@
 | Роль исполнителя | |
 | Source commit, полный SHA | |
 | Git status исходного checkout | |
-| VSIX path | `dist/kilo-hub-0.2.2-win32-x64.vsix` |
+| VSIX path | `dist/kilo-hub-0.2.3-win32-x64.vsix` |
 | VSIX SHA-256 | |
 | Размер VSIX, bytes | |
 | Результат exact verifier | |
@@ -39,11 +39,12 @@
 
 | ID | Действие и ожидаемый результат | Evidence | Результат | Исполнитель |
 | --- | --- | --- | --- | --- |
-| M-PKG-01 | SHA-256 вычислен после exact verifier; имя/manifest version равны `0.2.2`, target `win32-x64`; hash совпадает во всех дальнейших отчётах. | | | |
-| M-PKG-02 | Exact verifier подтверждает полный allow-list, hashes host/browser assets и отсутствие demo/tests/fixtures/requirements/reviews/source maps/DB sidecars. | | | |
-| M-PKG-03 | VSIX установлен с `--force` в пустые изолированные `--user-data-dir` и `--extensions-dir`; список extensions показывает ровно ожидаемый identity `@0.2.2`. | | | |
+| M-PKG-01 | SHA-256 вычислен после exact verifier; имя/manifest version равны `0.2.3`, target `win32-x64`; hash совпадает во всех дальнейших отчётах. | | | |
+| M-PKG-02 | Exact verifier подтверждает полный allow-list, hashes host/browser assets и обеих иконок `resources/kilo-hub.png`/`resources/hub.svg`, неизменность hub.svg и отсутствие demo/tests/fixtures/requirements/reviews/source maps/DB sidecars. | | | |
+| M-PKG-03 | VSIX установлен с `--force` в пустые изолированные `--user-data-dir` и `--extensions-dir`; список extensions показывает ровно ожидаемый identity `@0.2.3`. | | | |
 | M-PKG-04 | После restart VS Code Hub активируется, browser assets загружаются без blank view, 404, CSP error и внешних network requests. | | | |
 | M-PKG-05 | Packaged worker выполняет первый metadata-only refresh; Output не содержит activation/runtime error. | | | |
+| M-PKG-06 | Страница расширения показывает PNG `resources/kilo-hub.png`, на него ссылается manifest `icon`; Activity Bar использует прежний `resources/hub.svg` без изменения вида или назначения. | | | |
 
 ## Визуальная оболочка и размеры
 
@@ -94,31 +95,31 @@ NVDA запускается до открытия Hub. Фиксируются д
 
 | ID | Действие | Ожидаемое объявление/поведение | Evidence | Результат | Исполнитель |
 | --- | --- | --- | --- | --- | --- |
-| M-A11Y-01 | Tab на info | Доступное имя соответствует полному пояснению `Здесь собраны папки…`; tooltip появляется по focus и связан через ARIA. | | | |
-| M-A11Y-02 | Tab на refresh | Объявлено `Обновить список папок и диалогов из Kilo`, роль button; busy/disabled объявляется во время чтения. | | | |
-| M-A11Y-03 | Tab на collapsed folder head | Объявлены имя папки, роль button и состояние `свёрнуто`; current/missing текст доступен; декоративные инициалы не дублируются. | | | |
+| M-A11Y-01 | Tab на info | Доступное имя соответствует полному пояснению `Здесь собраны папки…`; визуального popup нет. | | | |
+| M-A11Y-02 | Tab на refresh | Объявлено `Обновить список папок и диалогов из Kilo`, роль button; busy/disabled объявляется во время чтения; визуального popup нет. | | | |
+| M-A11Y-03 | Tab на collapsed folder head | Объявлены имя папки, роль button и состояние `свёрнуто`; current/missing текст доступен; декоративные инициалы не дублируются; полный path доступен через постоянный `aria-describedby`, визуального popup нет. | | | |
 | M-A11Y-04 | Enter на folder head | Детали открыты; объявлено `развёрнуто`; `aria-controls` ведёт к видимым деталям. | | | |
 | M-A11Y-05 | Space на том же head | Детали закрыты; объявлено `свёрнуто`; скрытые descendants отсутствуют в Tab-порядке. | | | |
 | M-A11Y-06 | Закрыть карточку, когда focus в action | Фокус переводится на видимый логичный элемент, не остаётся внутри inert/hidden блока. | | | |
-| M-A11Y-07 | Tab по available non-current actions | Последовательно объявлены три точных action names; видимый focus не обрезан. | | | |
+| M-A11Y-07 | Tab по available non-current actions | Последовательно объявлены три точных action names; видимый focus не обрезан; визуальных popup нет. | | | |
 | M-A11Y-08 | Tab по current available | Доступен только `Показать файлы папки`; две open-команды не попадают в Tab. | | | |
 | M-A11Y-09 | Tab по missing | Ни одна action не попадает в Tab; история остаётся читаемой. | | | |
 | M-A11Y-10 | Initial loading / refreshing / initial error / refresh error | Изменение busy/status объявляется без чрезмерного повтора; stale data явно обозначены при refresh error. | | | |
-| M-A11Y-11 | Две папки с одинаковым именем | Keyboard focus tooltip/ARIA даёт полный путь и позволяет различить папки без мыши. | | | |
+| M-A11Y-11 | Две папки с одинаковым именем | Постоянный `aria-describedby` кнопки head даёт полный путь без мыши в collapsed/expanded состояниях; focus не показывает popup, `.folder-name` не создаёт отдельный Tab-stop. | | | |
 
 ## Tooltip
 
-УТЗ-09 имеет приоритет над удержанием popup из УТЗ-05 и прежним набором tooltip owners.
+УТЗ-10 имеет приоритет над УТЗ-05/09 и прежним набором owners. От УТЗ-09 сохраняются `pointer-events:none` и немедленное geometry dismissal. При проверке focus без hover указатель находится вне текста имени.
 
 | ID | Сценарий и ожидаемый результат | Evidence | Результат | Исполнитель |
 | --- | --- | --- | --- | --- |
-| M-TIP-01 | Hover path owner: полный path показан немедленно; движение между icon/name/date/current/missing внутри одного head не перезапускает и не меняет tooltip. | | | |
-| M-TIP-02 | Keyboard focus path owner: тот же path доступен без мыши и имеет устойчивую ARIA-связь. | | | |
-| M-TIP-03 | Перевести pointer в прямоугольник popup: popup исчезает немедленно, не перехватывает pointer/click и не появляется повторно до реального ухода и нового входа в owner. | | | |
-| M-TIP-04 | Escape: popup закрывается, устойчивый `aria-describedby` сохраняется, focus остаётся на source. | | | |
-| M-TIP-05 | Уход source и потеря focus после завершения взаимодействия закрывают popup без зависшего owner. | | | |
-| M-TIP-06 | Path/info/refresh/три actions имеют точные тексты; history/title/date/missing не создают tooltip. | | | |
-| M-TIP-07 | Owner у правого/нижнего края, width 260 и zoom 200%: popup позиционируется с viewport margin, не имеет внутреннего height clipping; физически обрезанный Webview текст полностью доступен через ARIA source. | | | |
+| M-TIP-01 | Hover именно текста `.folder-name`: полный path показан немедленно в collapsed/expanded/current/missing; свободное место строки имени и остальная площадь `.folder-head` popup не показывают. Проверить короткое и многострочное имя. | | | |
+| M-TIP-02 | Keyboard focus head: полный path доступен через постоянный `aria-describedby` без визуального popup; focus/blur сами не показывают и не удерживают tooltip. | | | |
+| M-TIP-03 | Перевести pointer внутрь или на границу прямоугольника popup, включая текст имени под popup: он исчезает в том же событии, не перехватывает pointer/click и не появляется повторно до реального leave/reentry текста имени, независимо от focus. | | | |
+| M-TIP-04 | Escape: popup закрывается, устойчивый `aria-describedby` head и текущий focus сохраняются; движение над именем не открывает popup до реального leave/reentry. | | | |
+| M-TIP-05 | Уход с текста имени на mono/date/current/missing/стрелку/свободное место head или popup немедленно закрывает подсказку без grace, даже при focus head. Возврат на текст имени разрешает новый показ. | | | |
+| M-TIP-06 | Hover/focus info/refresh/трёх actions/head вне текста имени/date/mono/history/conversations/current/missing/стрелки не показывает custom или native title popup; доступные имена кнопок и полный title диалога сохранены. Пассивные элементы не получают Tab-stop ради проверки. | | | |
+| M-TIP-07 | Текст `.folder-name` у правого/нижнего края, width 260 и zoom 200%: popup привязан к тексту имени, позиционируется с viewport margin, не имеет внутреннего height clipping; физически обрезанный Webview текст полностью доступен через `aria-describedby` кнопки head. | | | |
 | M-TIP-08 | Scroll/resize/theme change при открытом tooltip: позиция корректируется, popup не получает внутреннего height clipping; физическое clipping Webview соответствует M-TIP-07. | | | |
 
 ## Аккордеон, motion, scroll и focus
@@ -153,9 +154,9 @@ NVDA запускается до открытия Hub. Фиксируются д
 
 | ID | Состояние / действие | Ожидаемый результат | Evidence | Результат | Исполнитель |
 | --- | --- | --- | --- | --- | --- |
-| M-ACT-01 | Available non-current / `Открыть в этом окне` | Открывается выбранная fixture-folder вместо текущей в том же окне; tooltip имеет точный текст. | | | |
-| M-ACT-02 | Available non-current / `Открыть в отдельном окне` | Текущая папка остаётся, fixture-folder открывается в новом окне; tooltip точен. | | | |
-| M-ACT-03 | Available non-current / `Показать файлы папки` | Windows Explorer открывает именно проверенную fixture-folder; tooltip точен. | | | |
+| M-ACT-01 | Available non-current / `Открыть в этом окне` | Открывается выбранная fixture-folder вместо текущей в том же окне; hover/focus не показывает popup. | | | |
+| M-ACT-02 | Available non-current / `Открыть в отдельном окне` | Текущая папка остаётся, fixture-folder открывается в новом окне; hover/focus не показывает popup. | | | |
+| M-ACT-03 | Available non-current / `Показать файлы папки` | Windows Explorer открывает именно проверенную fixture-folder; hover/focus не показывает popup. | | | |
 | M-ACT-04 | Available current | В DOM/Tab только secondary Explorer action; обе open-команды отсутствуют. | | | |
 | M-ACT-05 | Missing non-current | Все actions и их контейнер отсутствуют; activation невозможна. | | | |
 | M-ACT-06 | Missing current | Missing приоритетнее current; все actions отсутствуют. | | | |

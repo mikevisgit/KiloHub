@@ -111,6 +111,8 @@ Package/install evidence для `0.2.1` на момент source review отсу
 
 ## Tooltip hotfix `0.2.2`
 
+Последующий source review `0.2.3`: findings отсутствуют. Проверены единственный owner inline `.folder-name`, `focusable:false`, ARIA description target на head и его cleanup, отсутствие остальных registrations, manifest/lock/verifier `0.2.3` и PNG. PNG совпадает с Kilo `7.7.5` logo-outline-black.png, SHA-256 `65F8A36A2C905AFC8AC063FC1CEADD1CEA396314310667B64D2E4A94D38EC87B`. Full `npm test`: `62/62` unit, `29/29` component, minimum Extension Host PASS. Exact package/install проверяются отдельно после source commit.
+
 Пользовательская проверка установленного `0.2.1` выявила несоответствие ожидаемому макету: tooltip заголовка истории и каждой строки диалога создавали лишний шум, а popup удерживался при наведении и перекрывал содержимое. Новое УТЗ-09 удаляет эти owners и возвращает геометрическое немедленное скрытие popup, сохраняя keyboard-focus и ARIA оставшихся интерактивных источников.
 
 Production удаляет `tabindex`/tooltip registration заголовка истории и registrations названий диалогов. Tooltip popup получает `pointer-events:none`; capture `pointermove` документа проверяет фактический `getBoundingClientRect`, немедленно скрывает popup внутри и на границе и удерживает dismissal latch до реального завершения взаимодействия с owner. Targeted component regressions проходят `29/29`; полный release gate и независимое review выполняются на candidate `0.2.2`.

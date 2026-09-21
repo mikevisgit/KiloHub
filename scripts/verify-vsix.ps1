@@ -6,8 +6,8 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $sourceManifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'package.json') -Raw | ConvertFrom-Json
-if ($sourceManifest.version -ne '0.2.2') {
-    throw "Step 2 tooltip hotfix release requires package version 0.2.2, found $($sourceManifest.version)."
+if ($sourceManifest.version -ne '0.2.3') {
+    throw "Step 2 release requires package version 0.2.3, found $($sourceManifest.version)."
 }
 $artifactName = "$($sourceManifest.name)-$($sourceManifest.version)-win32-x64.vsix"
 $artifactCandidate = if ([string]::IsNullOrWhiteSpace($ArtifactPath)) {
@@ -31,7 +31,8 @@ try {
         'extension/build/webview/webview.js',
         'extension/docs/release-notes.md',
         'extension/package.json',
-        'extension/resources/hub.svg'
+        'extension/resources/hub.svg',
+        'extension/resources/kilo-hub.png'
     ) | Sort-Object
     $entries = @($archive.Entries | ForEach-Object { $_.FullName } | Sort-Object)
     $difference = @(Compare-Object -ReferenceObject $expectedEntries -DifferenceObject $entries)
@@ -55,6 +56,22 @@ try {
     }
     if ($manifest.main -ne './build/extension.js') {
         throw "Unexpected VSIX entry point: $($manifest.main)"
+    }
+    if ($manifest.icon -ne 'resources/kilo-hub.png') {
+        throw 'Unexpected extension page icon.'
+    }
+    foreach ($iconName in @('kilo-hub.png', 'hub.svg')) {
+    $iconStream = $archive.GetEntry("extension/resources/$iconName").Open()
+    $iconHasher = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $iconHash = ([BitConverter]::ToString($iconHasher.ComputeHash($iconStream))).Replace('-', '')
+    } finally {
+        $iconStream.Dispose()
+        $iconHasher.Dispose()
+    }
+    if ($iconHash -ne (Get-FileHash -LiteralPath (Join-Path $repositoryRoot "resources/$iconName") -Algorithm SHA256).Hash) {
+        throw 'Packaged icon does not match source icon.'
+    }
     }
     if ($manifest.engines.vscode -ne '^1.105.1') {
         throw "Unexpected engines.vscode: $($manifest.engines.vscode)"

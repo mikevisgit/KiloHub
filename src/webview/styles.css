@@ -204,7 +204,7 @@ button {
 }
 
 .folder-name {
-  display: block;
+  display: inline;
   overflow-wrap: anywhere;
   font-size: var(--hub-name-size);
   font-weight: 600;

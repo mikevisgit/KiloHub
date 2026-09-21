@@ -6,6 +6,7 @@ const TOOLTIP_GAP = 4;
 
 export interface TooltipRegistrationOptions {
   readonly focusable?: boolean;
+  readonly descriptionTarget?: HTMLElement;
 }
 
 export interface TooltipControllerOptions {
@@ -26,6 +27,7 @@ interface TooltipEntry {
   readonly owner: HTMLElement;
   readonly tooltip: HTMLElement;
   readonly focusable: boolean;
+  readonly descriptionTarget: HTMLElement;
   readonly originalDescription: string | null;
   sourceHovered: boolean;
   sourceFocused: boolean;
@@ -208,6 +210,10 @@ export class TooltipController {
     if (this.#owners.has(owner)) {
       throw new Error('Tooltip owner is already registered.');
     }
+    const descriptionTarget = options.descriptionTarget ?? owner;
+    if (!this.#panel.contains(descriptionTarget)) {
+      throw new Error('Tooltip description target must be inside the controller panel.');
+    }
 
     const tooltip = owner.ownerDocument.createElement('div');
     tooltip.id = allocateTooltipId(owner.ownerDocument);
@@ -221,14 +227,15 @@ export class TooltipController {
     tooltip.style.overflowWrap = 'anywhere';
     tooltip.style.width = 'max-content';
 
-    const originalDescription = owner.getAttribute('aria-describedby');
-    owner.setAttribute('aria-describedby', addDescriptionToken(originalDescription, tooltip.id));
+    const originalDescription = descriptionTarget.getAttribute('aria-describedby');
+    descriptionTarget.setAttribute('aria-describedby', addDescriptionToken(originalDescription, tooltip.id));
     this.#panel.append(tooltip);
 
     const entry: TooltipEntry = {
       owner,
       tooltip,
       focusable: options.focusable ?? isNaturallyFocusable(owner),
+      descriptionTarget,
       originalDescription,
       sourceHovered: false,
       sourceFocused: false,
@@ -354,6 +361,11 @@ export class TooltipController {
     }
 
     this.#cancelHide();
+    if (this.#graceMs === 0 && !this.#isInteracting(entry)) {
+      this.#hideVisible();
+      this.#showMostRecentInteractingEntry();
+      return;
+    }
     this.#hideTimer = this.#environment.setTimeout(() => {
       this.#hideTimer = null;
       if (this.#visible === entry && !this.#isInteracting(entry)) {
@@ -431,9 +443,9 @@ export class TooltipController {
       this.#hideVisible();
     }
     if (entry.originalDescription === null) {
-      entry.owner.removeAttribute('aria-describedby');
+      entry.descriptionTarget.removeAttribute('aria-describedby');
     } else {
-      entry.owner.setAttribute('aria-describedby', entry.originalDescription);
+      entry.descriptionTarget.setAttribute('aria-describedby', entry.originalDescription);
     }
     entry.tooltip.remove();
   }

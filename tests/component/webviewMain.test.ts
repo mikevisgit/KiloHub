@@ -614,13 +614,23 @@ void test('recomputes nonce stylesheet badge variables on theme mutation without
     assert.match(themeStyle.textContent, /--folder-border:transparent/u);
 
     const info = harness.document.querySelector<HTMLElement>('.info');
+    const refresh = harness.document.querySelector<HTMLElement>('.refresh');
+    const name = harness.document.querySelector<HTMLElement>('.folder-name');
+    const header = harness.document.querySelector<HTMLElement>('.folder-head');
     assert.ok(info);
-    const tooltipId = info.getAttribute('aria-describedby');
+    assert.ok(refresh);
+    assert.ok(name);
+    assert.ok(header);
+    assert.equal(info.hasAttribute('aria-describedby'), false);
+    assert.equal(refresh.hasAttribute('aria-describedby'), false);
+    assert.equal(harness.document.querySelector('.action')?.hasAttribute('aria-describedby'), false);
+    assert.equal(harness.document.querySelectorAll('[role="tooltip"]').length, 1);
+    const tooltipId = header.getAttribute('aria-describedby');
     assert.ok(tooltipId);
     const tooltip = harness.document.getElementById(tooltipId);
     assert.ok(tooltip);
     let ownerLeft = 20;
-    info.getBoundingClientRect = () => ({
+    name.getBoundingClientRect = () => ({
       x: ownerLeft, y: 10, left: ownerLeft, top: 10, right: ownerLeft + 20, bottom: 30,
       width: 20, height: 20, toJSON: () => ({}),
     });
@@ -628,15 +638,30 @@ void test('recomputes nonce stylesheet badge variables on theme mutation without
       x: 0, y: 0, left: 0, top: 0, right: 100, bottom: 40,
       width: 100, height: 40, toJSON: () => ({}),
     });
-    info.dispatchEvent(
+    for (const target of Array.from(harness.document.querySelectorAll<HTMLElement>(
+      '.info, .refresh, .folder-head, .mono, .activity, .chevron, .action, .history-title, .conversation',
+    ))) {
+      target.dispatchEvent(new harness.window.PointerEvent('pointerover', { bubbles: true }) as unknown as Event);
+      target.dispatchEvent(new harness.window.FocusEvent('focusin', { bubbles: true }) as unknown as Event);
+      assert.equal(tooltip.hidden, true, `${target.className} must not show a tooltip`);
+      assert.equal(target.hasAttribute('title'), false);
+    }
+    header.dispatchEvent(
       new harness.window.PointerEvent('pointerover', { bubbles: true }) as unknown as Event,
     );
+    assert.equal(tooltip.hidden, true, 'the folder card itself is not a tooltip owner');
+    name.dispatchEvent(
+      new harness.window.PointerEvent('pointerover', { bubbles: true }) as unknown as Event,
+    );
+    assert.equal(tooltip.hidden, false);
     assert.equal(tooltip.style.left, '20px');
     ownerLeft = 80;
     harness.document.documentElement.dataset.vscodeThemeId = 'changed-theme';
     await Promise.resolve();
     await Promise.resolve();
     assert.equal(tooltip.style.left, '80px');
+    name.dispatchEvent(new harness.window.PointerEvent('pointerout', { bubbles: true }) as unknown as Event);
+    assert.equal(tooltip.hidden, true, 'leaving the name hides immediately without a grace timer');
   } finally {
     harness.dispose();
   }

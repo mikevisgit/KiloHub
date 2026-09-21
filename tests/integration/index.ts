@@ -34,6 +34,7 @@ interface ManifestCommand { command: string }
 interface ManifestView { id: string; name?: string; type?: string }
 interface ExtensionManifest {
   version: string;
+  icon: string;
   activationEvents: string[];
   contributes: {
     commands: ManifestCommand[];
@@ -420,7 +421,8 @@ export async function run(): Promise<void> {
     assert.equal(extension.isActive, false);
     assertManifest(extension.packageJSON);
     const manifest = extension.packageJSON;
-    assert.equal(manifest.version, '0.2.2');
+    assert.equal(manifest.version, '0.2.3');
+    assert.equal(manifest.icon, 'resources/kilo-hub.png');
     assert.deepEqual(sorted(manifest.activationEvents), sorted(['onCommand:kiloHub.refresh', 'onView:kiloHub.folders']));
     assert.deepEqual(sorted(manifest.contributes.commands.map(({ command }) => command)), sorted(COMMAND_IDS));
     assert.equal(manifest.contributes.viewsContainers.activitybar.length, 1);

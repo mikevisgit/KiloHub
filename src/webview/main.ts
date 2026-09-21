@@ -60,7 +60,6 @@ interface FolderView {
   readonly history: HTMLElement;
   readonly conversations: HTMLUListElement;
   readonly pathTooltip: TooltipRegistration;
-  readonly actionTooltips: readonly TooltipRegistration[];
   readonly conversationViews: Map<string, ConversationView>;
   dto: HubFolderDto;
 }
@@ -75,8 +74,8 @@ interface FocusSnapshot {
 type RgbColor = readonly [number, number, number];
 type RgbaColor = readonly [number, number, number, number];
 
-const INFO_TOOLTIP = 'Здесь собраны папки, в которых вы работали с Kilo. Чтобы вернуться к работе, выберите папку и откройте её.';
-const REFRESH_TOOLTIP = 'Обновить список папок и диалогов из Kilo';
+const INFO_LABEL = 'Здесь собраны папки, в которых вы работали с Kilo. Чтобы вернуться к работе, выберите папку и откройте её.';
+const REFRESH_LABEL = 'Обновить список папок и диалогов из Kilo';
 const UNKNOWN_DATE = 'Дата неизвестна';
 const DAY_MILLISECONDS = 86_400_000;
 const RENDER_CHUNK_SIZE = 50;
@@ -92,22 +91,18 @@ const LIGHT_FOLDER_FILLS = [
 
 const ACTION_COPY: Readonly<Record<FolderAction, {
   readonly label: string;
-  readonly tooltip: string;
   readonly primary: boolean;
 }>> = Object.freeze({
   openHere: {
     label: 'Открыть в этом окне',
-    tooltip: 'Выбранная папка откроется вместо текущей в этом окне VS Code',
     primary: true,
   },
   openNewWindow: {
     label: 'Открыть в отдельном окне',
-    tooltip: 'Текущая папка останется открытой',
     primary: false,
   },
   revealInExplorer: {
     label: 'Показать файлы папки',
-    tooltip: 'Откроется Проводник Windows',
     primary: false,
   },
 });
@@ -456,12 +451,12 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
   const info = createElement(document, 'button', 'icon-button info');
   info.type = 'button';
   info.textContent = 'ⓘ';
-  info.setAttribute('aria-label', INFO_TOOLTIP);
+  info.setAttribute('aria-label', INFO_LABEL);
   info.dataset.key = semanticKey('info');
   const refresh = createElement(document, 'button', 'icon-button refresh');
   refresh.type = 'button';
   refresh.textContent = '↻';
-  refresh.setAttribute('aria-label', REFRESH_TOOLTIP);
+  refresh.setAttribute('aria-label', REFRESH_LABEL);
   refresh.dataset.key = semanticKey('refresh');
   intro.append(title, info, refresh);
 
@@ -473,11 +468,7 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
   hub.append(intro, status, folders);
   appRoot.replaceChildren(hub);
 
-  const tooltipController = new TooltipController(hub, { environment });
-  const staticTooltips = [
-    tooltipController.register(info, INFO_TOOLTIP),
-    tooltipController.register(refresh, REFRESH_TOOLTIP),
-  ];
+  const tooltipController = new TooltipController(hub, { environment, graceMs: 0 });
   const folderViews = new Map<string, FolderView>();
   let accordionController: AccordionController | null = null;
   let hostState: HostToBrowserMessage | null = null;
@@ -582,11 +573,10 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
       actionButtons,
       history,
       conversations,
-      pathTooltip: tooltipController.register(header, dto.path),
-      actionTooltips: FOLDER_ACTIONS.map((action) => tooltipController.register(
-        actionButtons[action],
-        ACTION_COPY[action].tooltip,
-      )),
+      pathTooltip: tooltipController.register(name, dto.path, {
+        focusable: false,
+        descriptionTarget: header,
+      }),
       conversationViews: new Map(),
       dto,
     };
@@ -665,7 +655,6 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
 
   function disposeFolderView(view: FolderView): void {
     view.pathTooltip.dispose();
-    for (const registration of view.actionTooltips) registration.dispose();
     view.element.remove();
   }
 
@@ -916,7 +905,6 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
       refresh.removeEventListener('click', onRefresh);
       accordionController?.dispose();
       for (const view of folderViews.values()) disposeFolderView(view);
-      for (const registration of staticTooltips) registration.dispose();
       tooltipController.dispose();
     },
   };
