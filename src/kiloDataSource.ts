@@ -10,6 +10,13 @@ const DATABASE_TIMEOUT_MS = 5_000;
 const WORKER_TIMEOUT_MS = 10_000;
 const MAX_WARNING_COUNT = 100;
 
+export const KILO_METADATA_LIMITS = Object.freeze({
+  idLength: 512,
+  textLength: 4_096,
+  rows: 10_000,
+  characters: 4 * 1_024 * 1_024,
+});
+
 const METADATA_QUERY = `SELECT
   id,
   title,
@@ -233,12 +240,12 @@ function validateSessionRow(row: Record<string, unknown>): RawSessionMetadata | 
   if (
     typeof row.id !== 'string'
     || row.id.trim() === ''
-    || row.id.length > 512
+    || row.id.length > KILO_METADATA_LIMITS.idLength
     || typeof row.title !== 'string'
-    || row.title.length > 32_768
+    || row.title.length > KILO_METADATA_LIMITS.textLength
     || typeof row.directory !== 'string'
     || row.directory.length === 0
-    || row.directory.length > 32_768
+    || row.directory.length > KILO_METADATA_LIMITS.textLength
     || timeCreated === undefined
     || timeUpdated === undefined
     || !(row.parent_id === null || typeof row.parent_id === 'string')
@@ -258,6 +265,15 @@ function validateSessionRow(row: Record<string, unknown>): RawSessionMetadata | 
   };
 }
 
+function metadataCharacterCount(row: Record<string, unknown>): number {
+  const id = typeof row.id === 'string' ? row.id.length : 0;
+  const title = typeof row.title === 'string' ? row.title.length : 0;
+  const directory = typeof row.directory === 'string' ? row.directory.length : 0;
+  const parentId = typeof row.parent_id === 'string' ? row.parent_id.length : 0;
+  // A unique folder repeats directory as DTO id/path/name and adds monogram/activity text.
+  return id + title + parentId + directory * 3 + 56;
+}
+
 /** Runs inside the dedicated SQLite worker. */
 export function readKiloSessionsInCurrentThread(
   options: ReadKiloSessionsOptions = {},
@@ -267,21 +283,34 @@ export function readKiloSessionsInCurrentThread(
 
   return withReadOnlyDatabase(databasePath, (database) => {
     assertCompatibleSchema(database);
-    const rows = database.prepare(METADATA_QUERY).all() as Array<Record<string, unknown>>;
     const sessions: RawSessionMetadata[] = [];
     const warnings: string[] = [];
-    rows.forEach((row, index) => {
+    let rowCount = 0;
+    let characterCount = 0;
+    const rows = database.prepare(METADATA_QUERY).iterate() as Iterable<Record<string, unknown>>;
+    for (const row of rows) {
+      rowCount += 1;
+      if (rowCount > KILO_METADATA_LIMITS.rows) {
+        throw new KiloDataSourceError(
+          `Kilo metadata превышают лимит ${KILO_METADATA_LIMITS.rows} строк.`,
+        );
+      }
+      characterCount += metadataCharacterCount(row);
+      if (characterCount > KILO_METADATA_LIMITS.characters) {
+        throw new KiloDataSourceError('Kilo metadata превышают допустимый объём текста.');
+      }
+
       const session = validateSessionRow(row);
       if (session) {
         sessions.push(session);
       } else {
         if (warnings.length < MAX_WARNING_COUNT) {
-          warnings.push(`Строка session #${index + 1} пропущена: некорректные metadata-поля.`);
+          warnings.push(`Строка session #${rowCount} пропущена: некорректные metadata-поля.`);
         } else if (warnings.length === MAX_WARNING_COUNT) {
           warnings.push('Дополнительные предупреждения о повреждённых session подавлены.');
         }
       }
-    });
+    }
     return { sessions, warnings };
   });
 }
@@ -305,25 +334,28 @@ export function readKiloSessions(
       },
     });
     let settled = false;
-    const timeout = setTimeout(() => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      void worker.terminate();
-      reject(new KiloDataSourceError(`SQLite worker превысил лимит ${WORKER_TIMEOUT_MS} ms.`));
-    }, WORKER_TIMEOUT_MS);
+    let timeout: NodeJS.Timeout | undefined;
 
+    const cleanup = (): void => {
+      if (timeout !== undefined) {
+        clearTimeout(timeout);
+        timeout = undefined;
+      }
+      worker.removeListener('message', onMessage);
+      worker.removeListener('error', onError);
+      worker.removeListener('exit', onExit);
+      worker.unref();
+    };
     const settle = (action: () => void): void => {
       if (settled) {
         return;
       }
       settled = true;
-      clearTimeout(timeout);
+      cleanup();
       action();
     };
 
-    worker.once('message', (response: KiloDataWorkerResponse) => {
+    const onMessage = (response: KiloDataWorkerResponse): void => {
       settle(() => {
         if (response.error !== undefined) {
           const error = new KiloDataSourceError(response.error.message);
@@ -338,14 +370,24 @@ export function readKiloSessions(
         response.result.warnings.forEach((warning) => options.onWarning?.(warning));
         resolve(response.result.sessions);
       });
-    });
-    worker.once('error', (error) => settle(() => reject(error)));
-    worker.once('exit', (code) => {
+    };
+    const onError = (error: Error): void => settle(() => reject(error));
+    const onExit = (code: number): void => {
       settle(() => reject(new KiloDataSourceError(
         code === 0
           ? 'SQLite worker завершился без ответа.'
           : `SQLite worker завершился с кодом ${code}.`,
       )));
-    });
+    };
+
+    worker.once('message', onMessage);
+    worker.once('error', onError);
+    worker.once('exit', onExit);
+    timeout = setTimeout(() => {
+      settle(() => {
+        void worker.terminate().catch(() => undefined);
+        reject(new KiloDataSourceError(`SQLite worker превысил лимит ${WORKER_TIMEOUT_MS} ms.`));
+      });
+    }, WORKER_TIMEOUT_MS);
   });
 }

@@ -199,7 +199,7 @@ export class TooltipController {
     panel.addEventListener('pointerout', this.#onPointerOut);
     panel.addEventListener('focusin', this.#onFocusIn);
     panel.addEventListener('focusout', this.#onFocusOut);
-    panel.addEventListener('keydown', this.#onKeyDown);
+    panel.ownerDocument.addEventListener('keydown', this.#onKeyDown);
     panel.addEventListener('scroll', this.#onViewportChanged, true);
     environment.addEventListener('scroll', this.#onViewportChanged, true);
     environment.addEventListener('resize', this.#onViewportChanged);
@@ -339,7 +339,7 @@ export class TooltipController {
     this.#panel.removeEventListener('pointerout', this.#onPointerOut);
     this.#panel.removeEventListener('focusin', this.#onFocusIn);
     this.#panel.removeEventListener('focusout', this.#onFocusOut);
-    this.#panel.removeEventListener('keydown', this.#onKeyDown);
+    this.#panel.ownerDocument.removeEventListener('keydown', this.#onKeyDown);
     this.#panel.removeEventListener('scroll', this.#onViewportChanged, true);
     this.#environment.removeEventListener('scroll', this.#onViewportChanged, true);
     this.#environment.removeEventListener('resize', this.#onViewportChanged);
@@ -446,6 +446,7 @@ export class TooltipController {
 
   #hideVisible(): void {
     if (this.#visible !== null) {
+      this.#visible.popupHovered = false;
       this.#visible.tooltip.hidden = true;
       this.#visible = null;
     }

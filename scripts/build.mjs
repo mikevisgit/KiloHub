@@ -1,6 +1,7 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 import { build } from 'esbuild';
 
+await rm('build', { force: true, recursive: true });
 await mkdir('build', { recursive: true });
 await Promise.all([
   build({
@@ -22,7 +23,7 @@ await Promise.all([
     platform: 'browser',
     format: 'iife',
     target: 'chrome138',
-    outfile: 'build/webview.js',
+    outfile: 'build/webview/webview.js',
     minify: true,
     sourcemap: false,
     legalComments: 'none',
@@ -31,7 +32,7 @@ await Promise.all([
   build({
     entryPoints: ['src/webview/styles.css'],
     bundle: true,
-    outfile: 'build/webview.css',
+    outfile: 'build/webview/webview.css',
     minify: true,
     sourcemap: false,
     legalComments: 'none',

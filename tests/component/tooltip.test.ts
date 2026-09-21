@@ -189,6 +189,53 @@ void test('Escape remains latched until pointer, popup and focus have all left',
   controller.dispose();
 });
 
+void test('document Escape dismisses a hover-only tooltip and disposal removes the listener', async () => {
+  const { window, panel } = await setup();
+  const passive = window.document.createElement('span') as unknown as HTMLElement;
+  panel.append(passive);
+  const controller = new TooltipController(panel, {
+    environment: window as unknown as globalThis.Window,
+  });
+  const { tooltip } = controller.register(passive, 'Описание');
+
+  passive.dispatchEvent(pointerEvent(window, 'pointerover'));
+  assert.equal(tooltip.hidden, false);
+  const escape = new window.KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' });
+  window.document.body.dispatchEvent(escape);
+  assert.equal(tooltip.hidden, true);
+  assert.equal(escape.defaultPrevented, true);
+
+  controller.dispose();
+  const afterDispose = new window.KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' });
+  window.document.body.dispatchEvent(afterDispose);
+  assert.equal(afterDispose.defaultPrevented, false);
+});
+
+void test('switching from popup hover to another focused owner cannot revive the stale popup', async () => {
+  const { window, panel, timers } = await setup();
+  const first = window.document.createElement('button') as unknown as HTMLElement;
+  const second = window.document.createElement('button') as unknown as HTMLElement;
+  panel.append(first, second);
+  const controller = new TooltipController(panel, {
+    environment: window as unknown as globalThis.Window,
+  });
+  const firstRegistration = controller.register(first, 'Первый');
+  const secondRegistration = controller.register(second, 'Второй');
+
+  first.dispatchEvent(pointerEvent(window, 'pointerover'));
+  first.dispatchEvent(pointerEvent(window, 'pointerout', firstRegistration.tooltip));
+  firstRegistration.tooltip.dispatchEvent(pointerEvent(window, 'pointerover', first));
+  second.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }) as unknown as FocusEvent);
+  assert.equal(firstRegistration.tooltip.hidden, true);
+  assert.equal(secondRegistration.tooltip.hidden, false);
+
+  second.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true }) as unknown as FocusEvent);
+  timers.tick(TOOLTIP_GRACE_MS);
+  assert.equal(secondRegistration.tooltip.hidden, true);
+  assert.equal(firstRegistration.tooltip.hidden, true);
+  controller.dispose();
+});
+
 void test('passive owners are hover-only and popup text updates safely', async () => {
   const { window, panel } = await setup();
   const passive = window.document.createElement('span') as unknown as HTMLElement;

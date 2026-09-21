@@ -6,6 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 import test, { after } from 'node:test';
 
 import {
+  KILO_METADATA_LIMITS,
   KiloDataSourceError,
   readKiloSessions,
   readKiloSessionsInCurrentThread,
@@ -39,6 +40,31 @@ function createDatabase(schema = VALID_SCHEMA): string {
     database.close();
   }
   return databasePath;
+}
+
+function insertSessions(
+  databasePath: string,
+  count: number,
+  values: (index: number) => readonly [string, string, string],
+): void {
+  const database = new DatabaseSync(databasePath);
+  try {
+    const insert = database.prepare(`INSERT INTO session (
+      id, title, directory, parent_id, time_created, time_updated, time_archived
+    ) VALUES (?, ?, ?, NULL, 1000, 2000, NULL)`);
+    database.exec('BEGIN');
+    for (let index = 0; index < count; index += 1) {
+      insert.run(...values(index));
+    }
+    database.exec('COMMIT');
+  } finally {
+    database.close();
+  }
+}
+
+function fixedLengthId(index: number, length: number): string {
+  const prefix = index.toString().padStart(8, '0');
+  return `${prefix}${'i'.repeat(length - prefix.length)}`;
 }
 
 function readFixture(databasePath: string, overrides: { kiloVersion?: string; onWarning?: (message: string) => void } = {}) {
@@ -158,6 +184,79 @@ void test('reads the exact root non-archived metadata projection and skips malfo
   assert.equal(warnings.length, 1);
   assert.doesNotMatch(warnings[0], /PRIVATE TITLE|SECRET BODY/);
   assert.match(warnings[0], /metadata-поля/);
+});
+
+void test('accepts exact field bounds and isolates rows over id, title or path limits', () => {
+  const databasePath = createDatabase();
+  const database = new DatabaseSync(databasePath);
+  try {
+    const insert = database.prepare(`INSERT INTO session (
+      id, title, directory, parent_id, time_created, time_updated, time_archived
+    ) VALUES (?, ?, ?, NULL, 1000, ?, NULL)`);
+    insert.run(
+      'i'.repeat(KILO_METADATA_LIMITS.idLength),
+      't'.repeat(KILO_METADATA_LIMITS.textLength),
+      'D:\\'.padEnd(KILO_METADATA_LIMITS.textLength, 'p'),
+      4_000,
+    );
+    insert.run('i'.repeat(KILO_METADATA_LIMITS.idLength + 1), 'title', 'C:\\id', 3_000);
+    insert.run('title-over', 't'.repeat(KILO_METADATA_LIMITS.textLength + 1), 'C:\\title', 2_000);
+    insert.run('path-over', 'title', 'D:\\'.padEnd(KILO_METADATA_LIMITS.textLength + 1, 'p'), 1_000);
+  } finally {
+    database.close();
+  }
+  const warnings: string[] = [];
+
+  const sessions = readFixture(databasePath, { onWarning: (warning) => warnings.push(warning) });
+
+  assert.equal(sessions.length, 1);
+  assert.equal(sessions[0]?.id.length, KILO_METADATA_LIMITS.idLength);
+  assert.equal(sessions[0]?.title?.length, KILO_METADATA_LIMITS.textLength);
+  assert.equal(sessions[0]?.directory?.length, KILO_METADATA_LIMITS.textLength);
+  assert.equal(warnings.length, 3);
+});
+
+void test('accepts exact row and total text budgets and rejects the first excess row', () => {
+  const rowDatabasePath = createDatabase();
+  insertSessions(rowDatabasePath, KILO_METADATA_LIMITS.rows, (index) => [
+    `session-${index}`,
+    't',
+    'C:\\rows',
+  ]);
+  assert.equal(readFixture(rowDatabasePath).length, KILO_METADATA_LIMITS.rows);
+
+  const rowDatabase = new DatabaseSync(rowDatabasePath);
+  try {
+    rowDatabase.prepare(`INSERT INTO session VALUES (
+      'row-over', 't', 'C:\\rows', NULL, 1000, 3000, NULL
+    )`).run();
+  } finally {
+    rowDatabase.close();
+  }
+  assert.throws(() => readFixture(rowDatabasePath), /лимит 10000 строк/);
+
+  const textDatabasePath = createDatabase();
+  insertSessions(textDatabasePath, 247, (index) => [
+    fixedLengthId(index, KILO_METADATA_LIMITS.idLength),
+    't'.repeat(KILO_METADATA_LIMITS.textLength),
+    'D:\\'.padEnd(KILO_METADATA_LIMITS.textLength, 'p'),
+  ]);
+  insertSessions(textDatabasePath, 1, () => [
+    fixedLengthId(247, KILO_METADATA_LIMITS.idLength),
+    't'.repeat(KILO_METADATA_LIMITS.textLength),
+    'D:\\'.padEnd(832, 'p'),
+  ]);
+  assert.equal(readFixture(textDatabasePath).length, 248);
+
+  const textDatabase = new DatabaseSync(textDatabasePath);
+  try {
+    textDatabase.prepare(`INSERT INTO session VALUES (
+      'over', 't', 'C:\\x', NULL, 1000, 3000, NULL
+    )`).run();
+  } finally {
+    textDatabase.close();
+  }
+  assert.throws(() => readFixture(textDatabasePath), /допустимый объём текста/);
 });
 
 void test('rejects known Kilo versions below 7.7.5 before opening SQLite', () => {

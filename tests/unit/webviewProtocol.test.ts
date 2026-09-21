@@ -128,7 +128,14 @@ void test('requires exact finite safe nonnegative revisions and bounded folder I
     }), false);
   }
 
-  for (const folderId of ['', 'x'.repeat(WEBVIEW_PROTOCOL_LIMITS.idLength + 1), 42]) {
+  assert.equal(isBrowserToHostMessage({
+    type: 'folderAction',
+    version: PROTOCOL_VERSION,
+    revision: 1,
+    folderId: 'x'.repeat(WEBVIEW_PROTOCOL_LIMITS.folderIdLength),
+    action: 'openHere',
+  }), true);
+  for (const folderId of ['', 'x'.repeat(WEBVIEW_PROTOCOL_LIMITS.folderIdLength + 1), 42]) {
     assert.equal(isBrowserToHostMessage({
       type: 'folderAction',
       version: PROTOCOL_VERSION,
@@ -162,6 +169,19 @@ void test('validates exact DTO keys, canonical activity, color slot and nested b
   assert.equal(isHubFolderDto({ ...folder(), colorSlot: 1.5 }), false);
   assert.equal(isHubFolderDto({ ...folder(), colorSlot: null }), true);
   assert.equal(isHubFolderDto({ ...folder(), monogram: '' }), false);
+  assert.equal(isHubConversationDto({
+    id: 'x'.repeat(WEBVIEW_PROTOCOL_LIMITS.idLength),
+    title: 'x'.repeat(WEBVIEW_PROTOCOL_LIMITS.displayTextLength),
+  }), true);
+  assert.equal(isHubConversationDto({
+    id: 'x'.repeat(WEBVIEW_PROTOCOL_LIMITS.idLength + 1),
+    title: 'Title',
+  }), false);
+  assert.equal(isHubFolderDto({
+    ...folder(),
+    id: 'x'.repeat(WEBVIEW_PROTOCOL_LIMITS.folderIdLength),
+    path: 'x'.repeat(WEBVIEW_PROTOCOL_LIMITS.pathLength),
+  }), true);
   assert.equal(isHubFolderDto({
     ...folder(),
     name: 'x'.repeat(WEBVIEW_PROTOCOL_LIMITS.displayTextLength + 1),
@@ -277,6 +297,49 @@ void test('accepts every exact host state and rejects inconsistent discriminants
     () => folder(),
   );
   assert.equal(isHostToBrowserMessage({ ...states[2], folders: tooManyFolders }), false);
+});
+
+void test('enforces global conversation and metadata character budgets', () => {
+  const minimalFolder = (conversations: HubFolderDto['conversations'] = []): HubFolderDto => ({
+    id: 'i',
+    name: 'n',
+    path: 'p',
+    available: true,
+    current: false,
+    monogram: 'm',
+    colorSlot: null,
+    conversations,
+  });
+  const threeConversations = [
+    { id: 'a', title: '' },
+    { id: 'b', title: '' },
+    { id: 'c', title: '' },
+  ];
+  const exactConversationBudget = [
+    ...Array.from({ length: 3_333 }, () => minimalFolder(threeConversations)),
+    minimalFolder([{ id: 'a', title: '' }]),
+  ];
+  assert.equal(isHostToBrowserMessage({
+    ...readyMessage(),
+    folders: exactConversationBudget,
+  }), true);
+  assert.equal(isHostToBrowserMessage({
+    ...readyMessage(),
+    folders: [...exactConversationBudget, minimalFolder([{ id: 'a', title: '' }])],
+  }), false);
+
+  const exactTextBudget = Array.from({ length: 1_024 }, () => ({
+    ...minimalFolder(),
+    path: 'x'.repeat(4_093),
+  }));
+  assert.equal(isHostToBrowserMessage({
+    ...readyMessage(),
+    folders: exactTextBudget,
+  }), true);
+  assert.equal(isHostToBrowserMessage({
+    ...readyMessage(),
+    folders: [...exactTextBudget, minimalFolder()],
+  }), false);
 });
 
 void test('accepts host states only when their revision is newer than the applied revision', () => {

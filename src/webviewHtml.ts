@@ -2,13 +2,23 @@ import { randomBytes } from 'node:crypto';
 
 import * as vscode from 'vscode';
 
+export const WEBVIEW_ASSET_DIRECTORY = Object.freeze(['build', 'webview'] as const);
+
 export function createWebviewHtml(
   webview: vscode.Webview,
   extensionUri: vscode.Uri,
 ): string {
   const nonce = randomBytes(18).toString('base64url');
-  const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'build', 'webview.js'));
-  const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'build', 'webview.css'));
+  const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(
+    extensionUri,
+    ...WEBVIEW_ASSET_DIRECTORY,
+    'webview.js',
+  ));
+  const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(
+    extensionUri,
+    ...WEBVIEW_ASSET_DIRECTORY,
+    'webview.css',
+  ));
   const csp = [
     "default-src 'none'",
     `style-src ${webview.cspSource} 'nonce-${nonce}'`,
@@ -28,7 +38,7 @@ export function createWebviewHtml(
   <title>Kilo Hub</title>
 </head>
 <body>
-  <main id="app" aria-live="polite"></main>
+  <main id="app"></main>
   <script nonce="${nonce}" src="${scriptUri.toString()}"></script>
 </body>
 </html>`;

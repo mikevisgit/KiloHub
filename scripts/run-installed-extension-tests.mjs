@@ -5,14 +5,22 @@ import { fileURLToPath } from 'node:url';
 
 import { runTests, runVSCodeCommand } from '@vscode/test-electron';
 
+import { prepareIsolatedTestHost } from './isolated-test-host.mjs';
+
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(await readFile(path.join(repositoryRoot, 'package.json'), 'utf8'));
+const version = process.argv[2] ?? '1.105.1';
 const artifact = path.join(
   repositoryRoot,
   'dist',
   `${manifest.name}-${manifest.version}-win32-x64.vsix`,
 );
-const smokeRoot = path.join(repositoryRoot, 'build', 'installed-smoke');
+const smokeRoot = path.join(
+  repositoryRoot,
+  'build',
+  'installed-smoke',
+  version.replaceAll(/[^a-zA-Z0-9._-]/g, '_'),
+);
 const userDataDirectory = path.join(smokeRoot, 'user-data');
 const extensionsDirectory = path.join(smokeRoot, 'extensions');
 const profileArguments = [
@@ -38,34 +46,46 @@ if (verification.status !== 0) {
 await rm(smokeRoot, { force: true, recursive: true });
 delete process.env.ELECTRON_RUN_AS_NODE;
 
-await runVSCodeCommand([
-  ...profileArguments,
-  '--install-extension',
-  artifact,
-  '--force',
-], {
-  version: '1.105.1',
-});
-
-const installed = await runVSCodeCommand([
-  ...profileArguments,
-  '--list-extensions',
-  '--show-versions',
-], {
-  version: '1.105.1',
-});
-const expectedExtension = `${manifest.publisher}.${manifest.name}@${manifest.version}`;
-if (!installed.stdout.split(/\r?\n/).includes(expectedExtension)) {
-  throw new Error(`Installed extension was not listed: ${expectedExtension}`);
-}
-
-await runTests({
-  version: '1.105.1',
-  extensionDevelopmentPath: path.join(repositoryRoot, 'tests', 'fixtures', 'harness-extension'),
-  extensionTestsPath: path.join(repositoryRoot, 'build-tests', 'tests', 'integration', 'index.js'),
-  launchArgs: [
-    path.join(repositoryRoot, 'tests', 'fixtures', 'workspace'),
+const testHost = await prepareIsolatedTestHost(version);
+try {
+  await runVSCodeCommand([
     ...profileArguments,
-  ],
-  reuseMachineInstall: false,
-});
+    '--install-extension',
+    artifact,
+    '--force',
+  ], {
+    version,
+  });
+
+  const installed = await runVSCodeCommand([
+    ...profileArguments,
+    '--list-extensions',
+    '--show-versions',
+  ], {
+    version,
+  });
+  const expectedExtension = `${manifest.publisher}.${manifest.name}@${manifest.version}`;
+  if (!installed.stdout.split(/\r?\n/).includes(expectedExtension)) {
+    throw new Error(`Installed extension was not listed: ${expectedExtension}`);
+  }
+
+  await runTests({
+    vscodeExecutablePath: testHost.vscodeExecutablePath,
+    extensionDevelopmentPath: path.join(repositoryRoot, 'tests', 'fixtures', 'harness-extension'),
+    extensionTestsPath: path.join(repositoryRoot, 'build-tests', 'tests', 'integration', 'index.js'),
+    launchArgs: [
+      path.join(repositoryRoot, 'tests', 'fixtures', 'workspace'),
+      ...profileArguments,
+    ],
+    extensionTestsEnv: {
+      ...process.env,
+      ...(version === '1.105.1' ? {
+        KILO_HUB_EXPECTED_NODE: '22.19.0',
+        KILO_HUB_EXPECTED_ELECTRON: '37.6.0',
+      } : {}),
+    },
+    reuseMachineInstall: false,
+  });
+} finally {
+  await testHost.restore();
+}

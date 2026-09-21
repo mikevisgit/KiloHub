@@ -13,25 +13,44 @@ export function isLocalResolvedWindowsPath(value: string): boolean {
   return /^[A-Za-z]:[\\/]/.test(normalized) && win32.isAbsolute(normalized);
 }
 
-export async function isAvailableLocalDirectory(
+function canonicalLocalWindowsPath(value: string): string | undefined {
+  if (!isLocalResolvedWindowsPath(value)) {
+    return undefined;
+  }
+  return win32.normalize(value.startsWith('\\\\?\\') ? value.slice(4) : value);
+}
+
+export async function resolveAvailableLocalDirectory(
   path: string,
   timeoutMs = 500,
-): Promise<boolean> {
+): Promise<string | undefined> {
   let timeout: NodeJS.Timeout | undefined;
   try {
     return await Promise.race([
-      Promise.all([stat(path), realpath(path)]).then(([status, resolved]) => (
-        status.isDirectory() && isLocalResolvedWindowsPath(resolved)
-      )),
-      new Promise<boolean>((resolve) => {
-        timeout = setTimeout(() => resolve(false), timeoutMs);
+      realpath(path).then(async (resolved) => {
+        const canonical = canonicalLocalWindowsPath(resolved);
+        if (canonical === undefined) {
+          return undefined;
+        }
+        const status = await stat(canonical);
+        return status.isDirectory() ? canonical : undefined;
+      }),
+      new Promise<undefined>((resolve) => {
+        timeout = setTimeout(() => resolve(undefined), timeoutMs);
       }),
     ]);
   } catch {
-    return false;
+    return undefined;
   } finally {
     if (timeout !== undefined) {
       clearTimeout(timeout);
     }
   }
+}
+
+export async function isAvailableLocalDirectory(
+  path: string,
+  timeoutMs = 500,
+): Promise<boolean> {
+  return await resolveAvailableLocalDirectory(path, timeoutMs) !== undefined;
 }

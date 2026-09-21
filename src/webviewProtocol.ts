@@ -1,12 +1,15 @@
 export const PROTOCOL_VERSION = 1 as const;
 
 export const WEBVIEW_PROTOCOL_LIMITS = Object.freeze({
-  idLength: 1_024,
+  idLength: 512,
+  folderIdLength: 4_096,
   displayTextLength: 4_096,
-  pathLength: 32_767,
+  pathLength: 4_096,
   monogramLength: 32,
   folders: 10_000,
+  conversations: 10_000,
   conversationsPerFolder: 3,
+  metadataCharacters: 4 * 1_024 * 1_024,
 });
 
 export const WEBVIEW_STATE_MESSAGES = Object.freeze({
@@ -235,7 +238,7 @@ export function isHubFolderDto(value: unknown): value is HubFolderDto {
   }
 
   const colorSlot = candidate.colorSlot;
-  return isBoundedString(candidate.id, WEBVIEW_PROTOCOL_LIMITS.idLength)
+  return isBoundedString(candidate.id, WEBVIEW_PROTOCOL_LIMITS.folderIdLength)
     && isBoundedString(candidate.name, WEBVIEW_PROTOCOL_LIMITS.displayTextLength)
     && isBoundedString(candidate.path, WEBVIEW_PROTOCOL_LIMITS.pathLength)
     && typeof candidate.available === 'boolean'
@@ -249,8 +252,33 @@ export function isHubFolderDto(value: unknown): value is HubFolderDto {
 }
 
 export function isHubFolderArray(value: unknown): value is readonly HubFolderDto[] {
-  return isExactArray(value, WEBVIEW_PROTOCOL_LIMITS.folders)
-    && value.every(isHubFolderDto);
+  if (!isExactArray(value, WEBVIEW_PROTOCOL_LIMITS.folders)) {
+    return false;
+  }
+
+  let conversationCount = 0;
+  let characterCount = 0;
+  for (const entry of value) {
+    if (!isHubFolderDto(entry)) {
+      return false;
+    }
+    conversationCount += entry.conversations.length;
+    if (conversationCount > WEBVIEW_PROTOCOL_LIMITS.conversations) {
+      return false;
+    }
+    characterCount += entry.id.length
+      + entry.name.length
+      + entry.path.length
+      + entry.monogram.length
+      + (entry.activity?.length ?? 0);
+    for (const conversation of entry.conversations) {
+      characterCount += conversation.id.length + conversation.title.length;
+    }
+    if (characterCount > WEBVIEW_PROTOCOL_LIMITS.metadataCharacters) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function isFolderAction(value: unknown): value is FolderAction {
@@ -273,7 +301,7 @@ export function isBrowserToHostMessage(value: unknown): value is BrowserToHostMe
   const action = asExactObject(value, ['type', 'version', 'revision', 'folderId', 'action']);
   return action !== undefined
     && isProtocolRevision(action.revision)
-    && isBoundedString(action.folderId, WEBVIEW_PROTOCOL_LIMITS.idLength)
+    && isBoundedString(action.folderId, WEBVIEW_PROTOCOL_LIMITS.folderIdLength)
     && isFolderAction(action.action);
 }
 

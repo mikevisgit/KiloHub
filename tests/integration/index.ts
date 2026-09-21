@@ -43,6 +43,22 @@ interface ExtensionManifest {
   };
 }
 
+interface Deferred<T> {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
+}
+
+function deferred<T>(): Deferred<T> {
+  let resolvePromise: ((value: T) => void) | undefined;
+  const promise = new Promise<T>((resolveDeferred) => {
+    resolvePromise = resolveDeferred;
+  });
+  return {
+    promise,
+    resolve: (value: T) => resolvePromise?.(value),
+  };
+}
+
 function assertManifest(value: unknown): asserts value is ExtensionManifest {
   assert.equal(typeof value, 'object');
   assert.notEqual(value, null);
@@ -103,6 +119,18 @@ async function testHostProviderContract(repositoryRoot: string): Promise<void> {
   const outputLines: string[] = [];
   let workspacePath = 'C:\\Project';
   let failLoad = false;
+  let loadCalls = 0;
+  let pendingLoad: Deferred<readonly KiloFolder[]> | undefined;
+  let pendingWorkspace: Deferred<{
+    folderCount: number;
+    path: string;
+    scheme: string;
+    authority: string;
+    workspaceFile: null;
+    remote: false;
+  }> | undefined;
+  let pendingFinalGuard: Deferred<void> | undefined;
+  let finalGuardStarted = false;
   const folder: KiloFolder = {
     id: 'c:\\project',
     path: 'C:\\Project',
@@ -115,23 +143,42 @@ async function testHostProviderContract(repositoryRoot: string): Promise<void> {
   const output = {
     appendLine: (line: string): void => { outputLines.push(line); },
   } as unknown as vscode.OutputChannel;
+
   const provider = new KiloHubWebviewProvider({
     extensionUri: vscode.Uri.file(repositoryRoot),
     output,
-    loadFolders: () => failLoad ? Promise.reject(new Error('fixture failure')) : Promise.resolve([folder]),
-    workspaceDescriptor: () => Promise.resolve({
-      folderCount: 1,
-      path: workspacePath,
-      scheme: 'file',
-      authority: '',
-      workspaceFile: null,
-      remote: false,
-    }),
-    executeAction: (action, actionFolder) => {
-      actions.push({ action, folder: actionFolder });
-      return Promise.resolve();
+    loadFolders: () => {
+      loadCalls += 1;
+      const load = pendingLoad;
+      pendingLoad = undefined;
+      if (load !== undefined) return load.promise;
+      return failLoad ? Promise.reject(new Error('fixture failure')) : Promise.resolve([folder]);
+    },
+    workspaceDescriptor: () => {
+      const workspace = pendingWorkspace;
+      pendingWorkspace = undefined;
+      return workspace?.promise ?? Promise.resolve({
+        folderCount: 1,
+        path: workspacePath,
+        scheme: 'file',
+        authority: '',
+        workspaceFile: null,
+        remote: false,
+      });
+    },
+    executeAction: async (action, actionFolder, finalGuard) => {
+      if (pendingFinalGuard !== undefined) {
+        finalGuardStarted = true;
+        const guard = pendingFinalGuard;
+        pendingFinalGuard = undefined;
+        await guard.promise;
+      }
+      if (await finalGuard()) {
+        actions.push({ action, folder: actionFolder });
+      }
     },
     now: () => new Date('2026-09-20T12:00:00.000Z'),
+    browserReadyTimeoutMs: 50,
   });
   const webview = {
     options: {},
@@ -153,13 +200,28 @@ async function testHostProviderContract(repositoryRoot: string): Promise<void> {
   try {
     provider.resolveWebviewView(view);
     assert.equal(view.title, 'Kilo Hub');
-    assert.match(webview.html, /Content-Security-Policy/);
-    assert.match(webview.html, /build\/webview\.js/);
-    assert.match(webview.html, /build\/webview\.css/);
+    const csp = /Content-Security-Policy" content="([^"]+)"/u.exec(webview.html)?.[1];
+    assert.ok(csp);
+    assert.match(csp, /^default-src 'none'; style-src vscode-webview: 'nonce-[A-Za-z0-9_-]+'; script-src 'nonce-[A-Za-z0-9_-]+'; img-src 'none'; connect-src 'none'$/u);
+    assert.doesNotMatch(csp, /unsafe-eval|unsafe-inline|data:/u);
+    const styleNonce = /<style id="kilo-hub-theme-style" nonce="([^"]+)"><\/style>/u.exec(webview.html)?.[1];
+    const script = /<script nonce="([^"]+)" src="([^"]+)"><\/script>/u.exec(webview.html);
+    assert.ok(styleNonce);
+    assert.ok(script);
+    assert.equal(script[1], styleNonce);
+    assert.equal((webview.options.localResourceRoots as vscode.Uri[]).length, 1);
+    assert.equal(
+      (webview.options.localResourceRoots as vscode.Uri[])[0]?.fsPath,
+      join(repositoryRoot, 'build', 'webview'),
+    );
+    assert.doesNotMatch(webview.html, /<script(?![^>]*\bsrc=)[^>]*>|\son\w+=|javascript:|data:/iu);
+    assert.match(webview.html, /build\/webview\/webview\.js/);
+    assert.match(webview.html, /build\/webview\/webview\.css/);
     assert.doesNotMatch(webview.html, /Fixture conversation/);
 
     receiveEmitter.fire({ type: 'ready', version: PROTOCOL_VERSION });
     await waitUntil(() => provider.currentState.kind === 'ready');
+    assert.equal(loadCalls, 1);
     assert.equal(provider.currentState.folders[0]?.current, true);
     assert.deepEqual(posted.map((message) => (message as { kind?: string }).kind), ['initial', 'loading', 'ready']);
 
@@ -177,12 +239,117 @@ async function testHostProviderContract(repositoryRoot: string): Promise<void> {
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
     assert.deepEqual(actions.map(({ action }) => action), ['revealInExplorer', 'openNewWindow']);
 
+    workspacePath = 'C:\\Project';
+    const workspaceRaceRevision = provider.currentState.revision;
+    receiveEmitter.fire({ type: 'folderAction', version: PROTOCOL_VERSION, revision: workspaceRaceRevision, folderId: folder.id, action: 'openHere' });
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
+    assert.deepEqual(actions.map(({ action }) => action), ['revealInExplorer', 'openNewWindow']);
+
+    workspacePath = 'C:\\Other';
+    const staleWorkspace = deferred<{
+      folderCount: number;
+      path: string;
+      scheme: string;
+      authority: string;
+      workspaceFile: null;
+      remote: false;
+    }>();
+    pendingWorkspace = staleWorkspace;
+    const staleDuringAuthorizationRevision = provider.currentState.revision;
+    receiveEmitter.fire({ type: 'folderAction', version: PROTOCOL_VERSION, revision: staleDuringAuthorizationRevision, folderId: folder.id, action: 'revealInExplorer' });
+    await provider.workspaceChanged();
+    staleWorkspace.resolve({
+      folderCount: 1,
+      path: 'C:\\Other',
+      scheme: 'file',
+      authority: '',
+      workspaceFile: null,
+      remote: false,
+    });
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
+    assert.deepEqual(actions.map(({ action }) => action), ['revealInExplorer', 'openNewWindow']);
+
+    const deferredFinalGuard = deferred<void>();
+    pendingFinalGuard = deferredFinalGuard;
+    finalGuardStarted = false;
+    const finalGuardRevision = provider.currentState.revision;
+    receiveEmitter.fire({ type: 'folderAction', version: PROTOCOL_VERSION, revision: finalGuardRevision, folderId: folder.id, action: 'openNewWindow' });
+    await waitUntil(() => finalGuardStarted);
+    workspacePath = 'C:\\Project';
+    deferredFinalGuard.resolve();
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
+    assert.deepEqual(actions.map(({ action }) => action), ['revealInExplorer', 'openNewWindow']);
+
+    workspacePath = 'C:\\Other';
+    const deferredLoad = deferred<readonly KiloFolder[]>();
+    pendingLoad = deferredLoad;
+    const firstRefresh = provider.refresh();
+    const secondRefresh = provider.refresh();
+    await waitUntil(() => loadCalls === 2);
+    assert.equal(loadCalls, 2);
+    deferredLoad.resolve([folder]);
+    await Promise.all([firstRefresh, secondRefresh]);
+    assert.equal(loadCalls, 2);
+
+    const latePost = deferred<boolean>();
+    let deferNextPost = true;
+    (webview as unknown as { postMessage: (message: unknown) => Promise<boolean> }).postMessage = (message) => {
+      posted.push(message);
+      if (deferNextPost) {
+        deferNextPost = false;
+        return latePost.promise;
+      }
+      return Promise.resolve(true);
+    };
+    const latePublication = provider.workspaceChanged();
+    await waitUntil(() => !deferNextPost);
+    disposeEmitter.fire();
+
+    const revivedReceiveEmitter = new vscode.EventEmitter<unknown>();
+    const revivedDisposeEmitter = new vscode.EventEmitter<void>();
+    const revivedPosted: unknown[] = [];
+    const revivedWebview = {
+      options: {},
+      html: '',
+      cspSource: 'vscode-webview:',
+      asWebviewUri: (uri: vscode.Uri) => uri.with({ scheme: 'vscode-webview' }),
+      postMessage: (message: unknown) => { revivedPosted.push(message); return Promise.resolve(true); },
+      onDidReceiveMessage: revivedReceiveEmitter.event,
+    } as unknown as vscode.Webview;
+    const revivedView = {
+      title: '',
+      webview: revivedWebview,
+      visible: true,
+      onDidDispose: revivedDisposeEmitter.event,
+      onDidChangeVisibility: new vscode.EventEmitter<{ visible: boolean }>().event,
+      show: () => undefined,
+    } as unknown as vscode.WebviewView;
+    provider.resolveWebviewView(revivedView);
+    revivedReceiveEmitter.fire({ type: 'ready', version: PROTOCOL_VERSION });
+    latePost.resolve(false);
+    await latePublication;
+    await waitUntil(() => revivedPosted.length > 0);
+    assert.equal(outputLines.some((line) => line.includes('не принял state message')), false);
+    receiveEmitter.fire({ type: 'folderAction', version: PROTOCOL_VERSION, revision: provider.currentState.revision, folderId: folder.id, action: 'revealInExplorer' });
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
+    assert.deepEqual(actions.map(({ action }) => action), ['revealInExplorer', 'openNewWindow']);
     failLoad = true;
     await assert.rejects(provider.refresh(), /fixture failure/);
     assert.equal(provider.currentState.kind, 'refreshError');
     assert.equal(provider.currentState.folders.length, 1);
-    receiveEmitter.fire(Object.create({ type: 'refresh', version: PROTOCOL_VERSION }));
+    revivedReceiveEmitter.fire(Object.create({ type: 'refresh', version: PROTOCOL_VERSION }));
     assert.ok(outputLines.some((line) => line.includes('некорректное сообщение')));
+
+    revivedDisposeEmitter.fire();
+    provider.resolveWebviewView(view);
+    const disposedHandshake = provider.refresh();
+    disposeEmitter.fire();
+    await assert.rejects(disposedHandshake, /закрыт до готовности/);
+
+    provider.resolveWebviewView(revivedView);
+    await assert.rejects(provider.refresh(), /не ответил в течение 50 ms/);
+    revivedReceiveEmitter.dispose();
+    revivedDisposeEmitter.dispose();
   } finally {
     provider.dispose();
     receiveEmitter.dispose();
@@ -191,8 +358,16 @@ async function testHostProviderContract(repositoryRoot: string): Promise<void> {
 }
 
 export async function run(): Promise<void> {
-  assert.equal(process.versions.node, '22.19.0');
-  assert.equal(process.versions.electron, '37.6.0');
+  const expectedNode = process.env.KILO_HUB_EXPECTED_NODE;
+  const expectedElectron = process.env.KILO_HUB_EXPECTED_ELECTRON;
+  if (expectedNode !== undefined) {
+    assert.equal(process.versions.node, expectedNode);
+  } else {
+    assert.ok(Number(process.versions.node.split('.')[0]) >= 22);
+  }
+  if (expectedElectron !== undefined) {
+    assert.equal(process.versions.electron, expectedElectron);
+  }
   const runtimeProbe = new DatabaseSync(':memory:');
   try {
     assert.equal(typeof runtimeProbe.prepare('SELECT sqlite_version()').get(), 'object');
@@ -201,8 +376,8 @@ export async function run(): Promise<void> {
   }
 
   const repositoryRoot = resolve(__dirname, '..', '..', '..');
-  assert.equal(existsSync(join(repositoryRoot, 'build', 'webview.js')), true);
-  assert.equal(existsSync(join(repositoryRoot, 'build', 'webview.css')), true);
+  assert.equal(existsSync(join(repositoryRoot, 'build', 'webview', 'webview.js')), true);
+  assert.equal(existsSync(join(repositoryRoot, 'build', 'webview', 'webview.css')), true);
   await testHostProviderContract(repositoryRoot);
 
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'kilo-hub-extension-'));

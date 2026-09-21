@@ -68,6 +68,13 @@ interface FolderView {
   dto: HubFolderDto;
 }
 
+interface FocusSnapshot {
+  readonly key: string;
+  readonly folderId: string | null;
+  readonly folderIndex: number;
+  readonly folderOrder: readonly string[];
+}
+
 type RgbColor = readonly [number, number, number];
 type RgbaColor = readonly [number, number, number, number];
 
@@ -76,6 +83,7 @@ const REFRESH_TOOLTIP = 'Обновить список папок и диало�
 const HISTORY_TOOLTIP = 'До трёх последних диалогов. Открыть и продолжить их можно в Kilo Code';
 const UNKNOWN_DATE = 'Дата неизвестна';
 const DAY_MILLISECONDS = 86_400_000;
+const RENDER_CHUNK_SIZE = 50;
 const ACTIVITY_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
 const COLOR_SLOT_ORDER = [1, 6, 12, 9, 15, 5, 2, 13, 8, 0, 10, 3, 14, 7, 11, 4] as const;
 const COLOR_HUES = [0, 20, 38, 55, 76, 100, 130, 155, 175, 195, 215, 235, 255, 275, 300, 330] as const;
@@ -88,25 +96,21 @@ const LIGHT_FOLDER_FILLS = [
 
 const ACTION_COPY: Readonly<Record<FolderAction, {
   readonly label: string;
-  readonly icon: string;
   readonly tooltip: string;
   readonly primary: boolean;
 }>> = Object.freeze({
   openHere: {
     label: 'Открыть в этом окне',
-    icon: '→',
     tooltip: 'Выбранная папка откроется вместо текущей в этом окне VS Code',
     primary: true,
   },
   openNewWindow: {
     label: 'Открыть в отдельном окне',
-    icon: '↗',
     tooltip: 'Текущая папка останется открытой',
     primary: false,
   },
   revealInExplorer: {
     label: 'Показать файлы папки',
-    icon: '⌕',
     tooltip: 'Откроется Проводник Windows',
     primary: false,
   },
@@ -195,8 +199,51 @@ function plural(value: number, one: string, few: string, many: string): string {
   return many;
 }
 
+interface CalendarParts {
+  readonly year: number;
+  readonly month: number;
+  readonly day: number;
+  readonly hour: number;
+  readonly minute: number;
+}
+
+function calendarParts(value: Date, timeZone?: string): CalendarParts {
+  if (timeZone === undefined) {
+    return {
+      year: value.getFullYear(),
+      month: value.getMonth() + 1,
+      day: value.getDate(),
+      hour: value.getHours(),
+      minute: value.getMinutes(),
+    };
+  }
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    hourCycle: 'h23',
+  }).formatToParts(value);
+  const numeric = (type: Intl.DateTimeFormatPartTypes): number => Number(
+    parts.find((part) => part.type === type)?.value,
+  );
+  return {
+    year: numeric('year'),
+    month: numeric('month'),
+    day: numeric('day'),
+    hour: numeric('hour'),
+    minute: numeric('minute'),
+  };
+}
+
 /** Browser-only formatter kept independent from the host presentation import chain. */
-export function formatBrowserRelativeActivity(value: string | undefined, now: Date): string {
+export function formatBrowserRelativeActivity(
+  value: string | undefined,
+  now: Date,
+  timeZone?: string,
+): string {
   if (value === undefined || !ACTIVITY_PATTERN.test(value)) {
     return UNKNOWN_DATE;
   }
@@ -210,16 +257,18 @@ export function formatBrowserRelativeActivity(value: string | undefined, now: Da
   }
 
   const activity = new Date(timestamp);
-  const nowDay = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / DAY_MILLISECONDS;
+  const nowParts = calendarParts(now, timeZone);
+  const activityParts = calendarParts(activity, timeZone);
+  const nowDay = Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day) / DAY_MILLISECONDS;
   const activityDay = Date.UTC(
-    activity.getFullYear(),
-    activity.getMonth(),
-    activity.getDate(),
+    activityParts.year,
+    activityParts.month - 1,
+    activityParts.day,
   ) / DAY_MILLISECONDS;
   const days = nowDay - activityDay;
   if (days < 0) return UNKNOWN_DATE;
   if (days === 0) {
-    return `Сегодня, ${activity.getHours().toString().padStart(2, '0')}:${activity.getMinutes().toString().padStart(2, '0')}`;
+    return `Сегодня, ${activityParts.hour.toString().padStart(2, '0')}:${activityParts.minute.toString().padStart(2, '0')}`;
   }
   if (days === 1) return 'Вчера';
   if (days <= 6) return `${days} ${plural(days, 'день', 'дня', 'дней')} назад`;
@@ -396,6 +445,7 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
     throw new Error('Kilo Hub Webview requires #app.');
   }
   const appRoot = root;
+  appRoot.removeAttribute('aria-live');
   const existingThemeStyle = document.getElementById('kilo-hub-theme-style') as HTMLStyleElement | null;
   const themeStyle = existingThemeStyle ?? createElement(document, 'style');
   if (existingThemeStyle === null) {
@@ -409,8 +459,8 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
   title.textContent = 'Мои папки с Kilo';
   const info = createElement(document, 'button', 'icon-button info');
   info.type = 'button';
-  info.textContent = 'i';
-  info.setAttribute('aria-label', 'О списке папок Kilo');
+  info.textContent = 'ⓘ';
+  info.setAttribute('aria-label', INFO_TOOLTIP);
   info.dataset.key = semanticKey('info');
   const refresh = createElement(document, 'button', 'icon-button refresh');
   refresh.type = 'button';
@@ -440,6 +490,8 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
   let pendingExpandedFolderKey: number | null = null;
   let restoredScrollTop: number | undefined;
   let midnightTimer: number | null = null;
+  let renderGeneration = 0;
+  let pendingFocus: FocusSnapshot | null = null;
   let disposed = false;
 
   function persist(): void {
@@ -468,12 +520,9 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
     const copy = ACTION_COPY[action];
     const button = createElement(document, 'button', `action${copy.primary ? ' primary' : ''}`);
     button.type = 'button';
-    const icon = createElement(document, 'span', 'action-icon');
-    icon.textContent = copy.icon;
-    icon.setAttribute('aria-hidden', 'true');
     const label = createElement(document, 'span', 'action-label');
     label.textContent = copy.label;
-    button.append(icon, label);
+    button.append(label);
     button.setAttribute('aria-label', copy.label);
     button.dataset.action = action;
     button.dataset.key = semanticKey('folder-action', folderId, action);
@@ -514,7 +563,7 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
     ])) as unknown as Record<FolderAction, HTMLButtonElement>;
     actions.append(...FOLDER_ACTIONS.map((action) => actionButtons[action]));
     const history = createElement(document, 'section', 'history');
-    const historyTitle = createElement(document, 'h3', 'history-title');
+    const historyTitle = createElement(document, 'h2', 'history-title');
     historyTitle.textContent = 'Последние диалоги';
     historyTitle.tabIndex = 0;
     historyTitle.dataset.key = semanticKey('folder-history', dto.id);
@@ -589,7 +638,7 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
   }
 
   function updateFolderAria(view: FolderView): void {
-    const parts = [view.dto.name, `Путь: ${view.dto.path}`];
+    const parts = [view.dto.name];
     if (view.dto.current && view.dto.available) parts.push('Вы сейчас здесь');
     if (!view.dto.available) parts.push('Папка не найдена');
     parts.push(view.activity.textContent ?? UNKNOWN_DATE);
@@ -655,25 +704,76 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
     });
   }
 
-  function focusedSemanticKey(): string | null {
+  function captureFocus(): FocusSnapshot | null {
     const active = document.activeElement;
-    return active !== null && 'dataset' in active
-      ? (active as HTMLElement).dataset.key ?? null
-      : null;
+    if (active === null || !('dataset' in active) || !appRoot.contains(active)) {
+      return null;
+    }
+    const activeElement = active as HTMLElement;
+    const key = activeElement.dataset.key;
+    if (key === undefined) return null;
+    const folderElement = activeElement.closest<HTMLElement>('.folder');
+    const folderOrder = Array.from(folders.querySelectorAll<HTMLElement>('.folder'))
+      .flatMap((element) => element.dataset.folderId === undefined ? [] : [element.dataset.folderId]);
+    const folderId = folderElement?.dataset.folderId ?? null;
+    return {
+      key,
+      folderId,
+      folderIndex: folderId === null ? -1 : folderOrder.indexOf(folderId),
+      folderOrder,
+    };
   }
 
-  function restoreFocus(key: string | null): void {
-    if (key === null) return;
+  function restoreFocus(snapshot: FocusSnapshot | null): void {
+    if (snapshot === null) return;
     for (const element of Array.from(appRoot.querySelectorAll<HTMLElement>('[data-key]'))) {
-      if (element.dataset.key === key) {
+      if (element.dataset.key === snapshot.key) {
         element.focus({ preventScroll: true });
         return;
       }
     }
+
+    if (snapshot.folderId !== null) {
+      const sameFolder = folderViews.get(snapshot.folderId);
+      if (sameFolder !== undefined) {
+        sameFolder.header.focus({ preventScroll: true });
+        return;
+      }
+      for (let distance = 1; distance < snapshot.folderOrder.length; distance += 1) {
+        const following = snapshot.folderOrder[snapshot.folderIndex + distance];
+        const preceding = snapshot.folderOrder[snapshot.folderIndex - distance];
+        const nearest = (following === undefined ? undefined : folderViews.get(following))
+          ?? (preceding === undefined ? undefined : folderViews.get(preceding));
+        if (nearest !== undefined) {
+          nearest.header.focus({ preventScroll: true });
+          return;
+        }
+      }
+    }
+    refresh.focus({ preventScroll: true });
   }
 
-  function renderState(state: HostToBrowserMessage, restoredScrollTop?: number): void {
-    const focusKey = focusedSemanticKey();
+  function yieldRender(): Promise<void> {
+    return new Promise((resolve) => environment.setTimeout(resolve, 0));
+  }
+
+  function renderIsCurrent(generation: number): boolean {
+    return !disposed && generation === renderGeneration;
+  }
+
+  async function renderState(
+    state: HostToBrowserMessage,
+    generation: number,
+    restoredScrollTop?: number,
+  ): Promise<boolean> {
+    const totalWork = folderViews.size + state.folders.length;
+    const chunked = totalWork > RENDER_CHUNK_SIZE;
+    if (chunked) {
+      await yieldRender();
+      if (!renderIsCurrent(generation)) return false;
+    }
+    pendingFocus = captureFocus() ?? pendingFocus;
+    const focusSnapshot = pendingFocus;
     const previousScrollTop = restoredScrollTop ?? folders.scrollTop;
     if (pendingExpandedFolderKey !== null) {
       const matches = state.folders.filter(({ id }) => persistedFolderKey(id) === pendingExpandedFolderKey);
@@ -685,10 +785,16 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
       || [...folderViews.keys()].some((id) => !nextIds.has(id));
     if (topologyChanged) accordionController?.dispose();
 
+    let processed = 0;
     for (const [id, view] of folderViews) {
       if (nextIds.has(id)) continue;
       disposeFolderView(view);
       folderViews.delete(id);
+      processed += 1;
+      if (chunked && processed % RENDER_CHUNK_SIZE === 0 && processed < totalWork) {
+        await yieldRender();
+        if (!renderIsCurrent(generation)) return false;
+      }
     }
     for (const dto of state.folders) {
       let view = folderViews.get(dto.id);
@@ -699,25 +805,35 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
         updateFolderView(view, dto);
       }
       folders.append(view.element);
+      processed += 1;
+      if (chunked && processed % RENDER_CHUNK_SIZE === 0 && processed < totalWork) {
+        await yieldRender();
+        if (!renderIsCurrent(generation)) return false;
+      }
     }
+    if (!renderIsCurrent(generation)) return false;
     if (expandedFolderId !== null && !nextIds.has(expandedFolderId)) {
       expandedFolderId = null;
     }
     if (topologyChanged || accordionController === null) rebuildAccordion();
 
-    status.textContent = state.message ?? '';
-    hub.setAttribute('aria-busy', String(state.busy));
-    refresh.disabled = state.busy;
     folders.scrollTop = previousScrollTop;
-    restoreFocus(focusKey);
+    restoreFocus(captureFocus() ?? focusSnapshot);
+    pendingFocus = null;
+    return true;
   }
 
   function applyState(value: unknown, restoredScrollTop?: number): boolean {
     if (!shouldApplyHostMessage(value, lastAppliedRevision)) return false;
     hostState = value;
     lastAppliedRevision = value.revision;
-    renderState(value, restoredScrollTop);
-    persist();
+    const generation = ++renderGeneration;
+    status.textContent = value.message ?? '';
+    hub.setAttribute('aria-busy', String(value.busy));
+    refresh.disabled = value.busy;
+    void renderState(value, generation, restoredScrollTop).then((completed) => {
+      if (completed && renderIsCurrent(generation)) persist();
+    });
     return true;
   }
 
@@ -734,6 +850,7 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
       const border = palette.border === null ? 'transparent' : rgbCss(palette.border);
       return `.kilo-color-${slot}{--folder-bg:${rgbCss(palette.background)};--folder-fg:${rgbCss(palette.foreground)};--folder-border:${border}}`;
     }).join('\n');
+    tooltipController.reposition();
   }
 
   function scheduleMidnight(): void {
@@ -801,6 +918,7 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
     dispose: (): void => {
       if (disposed) return;
       disposed = true;
+      renderGeneration += 1;
       if (midnightTimer !== null) environment.clearTimeout(midnightTimer);
       themeObserver.disconnect();
       for (const mediaQuery of mediaQueries) mediaQuery.removeEventListener('change', updateTheme);

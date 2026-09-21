@@ -85,6 +85,7 @@ async function setup(options: {
   const document = window.document as unknown as Document;
   const root = document.createElement('main');
   root.id = 'app';
+  root.setAttribute('aria-live', 'polite');
   document.body.append(root);
   options.beforeStart?.(window);
   const api = new FakeVsCodeApi(options.restored);
@@ -121,6 +122,25 @@ function buttonActions(element: HTMLElement): string[] {
     .map((button) => button.dataset.action ?? '');
 }
 
+function waitFor(window: HappyWindow, predicate: () => boolean): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+    const check = (): void => {
+      if (predicate()) {
+        resolve();
+        return;
+      }
+      attempts += 1;
+      if (attempts >= 100) {
+        reject(new Error('Timed out waiting for browser render.'));
+        return;
+      }
+      window.setTimeout(check, 0);
+    };
+    check();
+  });
+}
+
 void test('persists only opaque UI state and restores it after the host republishes data', async () => {
   const first = await setup({
     beforeStart: (window) => window.document.body.classList.add('vscode-reduce-motion'),
@@ -145,6 +165,15 @@ void test('persists only opaque UI state and restores it after the host republis
   try {
     assert.equal(second.document.querySelector('h1')?.textContent, 'Мои папки с Kilo');
     assert.equal(second.document.querySelectorAll('h1').length, 1);
+    assert.equal(second.document.getElementById('app')?.hasAttribute('aria-live'), false);
+    assert.equal(second.document.querySelectorAll('[aria-live]').length, 1);
+    assert.equal(second.document.querySelector('[aria-live]')?.classList.contains('view-status'), true);
+    const info = second.document.querySelector<HTMLButtonElement>('.info');
+    assert.equal(info?.textContent, 'ⓘ');
+    assert.equal(
+      info?.getAttribute('aria-label'),
+      'Здесь собраны папки, в которых вы работали с Kilo. Чтобы вернуться к работе, выберите папку и откройте её.',
+    );
     assert.equal(second.document.body.textContent?.includes('Kilo Folders'), false);
     assert.equal(second.document.querySelectorAll('.folder').length, 0);
     assert.deepEqual(second.api.messages, [{ type: 'ready', version: PROTOCOL_VERSION }]);
@@ -240,6 +269,11 @@ void test('renders the exact current/missing action matrix and posts current rev
     assert.deepEqual(buttonActions(folderElement(harness.document, 'normal')), [
       'openHere', 'openNewWindow', 'revealInExplorer',
     ]);
+    assert.equal(harness.document.querySelector('.action-icon'), null);
+    assert.equal(
+      folderElement(harness.document, 'normal').querySelector('[data-action="openHere"]')?.textContent,
+      'Открыть в этом окне',
+    );
     assert.deepEqual(buttonActions(folderElement(harness.document, 'current')), ['revealInExplorer']);
     for (const id of ['missing', 'missing-current']) {
       const element = folderElement(harness.document, id);
@@ -345,10 +379,14 @@ void test('uses text-only DOM and exposes full passive conversation text once to
     assert.equal(element.querySelector('img, script'), null);
     assert.equal(element.querySelector('.folder-name')?.textContent, hostileName);
     const headerLabel = element.querySelector('.folder-head')?.getAttribute('aria-label') ?? '';
-    assert.match(headerLabel, /Путь: C:\\<script>bad\(\)<\/script>/u);
+    assert.doesNotMatch(headerLabel, /Путь:/u);
+    assert.doesNotMatch(headerLabel, /C:\\<script>bad\(\)<\/script>/u);
     assert.doesNotMatch(headerLabel, /Вы сейчас здесь/u);
     assert.match(headerLabel, /Папка не найдена/u);
     assert.match(headerLabel, /Сегодня/u);
+    const descriptionId = element.querySelector('.folder-head')?.getAttribute('aria-describedby');
+    assert.ok(descriptionId);
+    assert.equal(harness.document.getElementById(descriptionId)?.textContent, hostilePath);
     assert.equal(element.classList.contains('current'), false);
     assert.equal(element.querySelector<HTMLElement>('.current-label')?.hidden, true);
 
@@ -359,6 +397,7 @@ void test('uses text-only DOM and exposes full passive conversation text once to
     assert.equal(conversation.querySelector('[aria-hidden="true"]')?.textContent, hostileTitle);
     assert.equal(conversation.querySelector('.sr-only')?.textContent, hostileTitle);
     assert.equal(element.querySelectorAll('.conversation .sr-only').length, 1);
+    assert.equal(element.querySelector('.history-title')?.tagName, 'H2');
   } finally {
     harness.dispose();
   }
@@ -381,6 +420,163 @@ void test('refreshes reliable local relative dates on focus without a host messa
       'Дата неизвестна',
     );
     assert.equal(formatBrowserRelativeActivity('invalid', clock), 'Дата неизвестна');
+  } finally {
+    harness.dispose();
+  }
+});
+
+void test('browser date labels cover canonical boundaries, plural forms, leap day and DST', () => {
+  const now = new Date('2026-09-20T12:00:00.000Z');
+  const cases: ReadonlyArray<readonly [number, string]> = [
+    [0, 'Сегодня, 12:00'],
+    [1, 'Вчера'],
+    [2, '2 дня назад'],
+    [6, '6 дней назад'],
+    [7, 'Неделю назад'],
+    [13, 'Неделю назад'],
+    [14, '2 недели назад'],
+    [20, '2 недели назад'],
+    [21, '3 недели назад'],
+    [29, '3 недели назад'],
+    [30, 'Месяц назад'],
+    [59, 'Месяц назад'],
+    [60, '2 месяца назад'],
+    [330, '11 месяцев назад'],
+    [364, '12 месяцев назад'],
+    [365, 'Год назад'],
+    [730, '2 года назад'],
+    [1_825, '5 лет назад'],
+  ];
+  for (const [days, expected] of cases) {
+    assert.equal(
+      formatBrowserRelativeActivity(
+        new Date(now.getTime() - days * 86_400_000).toISOString(),
+        now,
+        'UTC',
+      ),
+      expected,
+      `${days} calendar days`,
+    );
+  }
+  assert.equal(
+    formatBrowserRelativeActivity(
+      '2024-03-10T06:30:00.000Z',
+      new Date('2024-03-11T04:30:00.000Z'),
+      'America/New_York',
+    ),
+    'Вчера',
+  );
+  assert.equal(
+    formatBrowserRelativeActivity(
+      '2024-11-03T04:30:00.000Z',
+      new Date('2024-11-04T05:30:00.000Z'),
+      'America/New_York',
+    ),
+    'Вчера',
+  );
+  assert.equal(
+    formatBrowserRelativeActivity(
+      '2024-02-29T23:30:00.000Z',
+      new Date('2024-03-01T12:00:00.000Z'),
+      'UTC',
+    ),
+    'Вчера',
+  );
+});
+
+void test('restores removed action focus to its folder, then nearest folder and refresh', async () => {
+  const first = folder({ id: 'first', name: 'First', path: 'C:\\First' });
+  const second = folder({ id: 'second', name: 'Second', path: 'C:\\Second' });
+  const third = folder({ id: 'third', name: 'Third', path: 'C:\\Third' });
+  const harness = await setup({
+    beforeStart: (window) => window.document.body.classList.add('vscode-reduce-motion'),
+  });
+  try {
+    harness.send(ready(1, [first, second, third]));
+    const firstElement = folderElement(harness.document, 'first');
+    (firstElement.querySelector('.folder-head') as HTMLButtonElement).click();
+    const firstAction = firstElement.querySelector<HTMLButtonElement>('[data-action="openHere"]');
+    assert.ok(firstAction);
+    firstAction.focus();
+    harness.send(ready(2, [{ ...first, current: true }, second, third]));
+    assert.equal(harness.document.activeElement, firstElement.querySelector('.folder-head'));
+
+    const secondElement = folderElement(harness.document, 'second');
+    (secondElement.querySelector('.folder-head') as HTMLButtonElement).click();
+    const secondAction = secondElement.querySelector<HTMLButtonElement>('[data-action="openHere"]');
+    assert.ok(secondAction);
+    secondAction.focus();
+    harness.send(ready(3, [{ ...first, current: true }, third]));
+    assert.equal(
+      harness.document.activeElement,
+      folderElement(harness.document, 'third').querySelector('.folder-head'),
+    );
+
+    (folderElement(harness.document, 'third').querySelector('.folder-head') as HTMLButtonElement).focus();
+    harness.send(ready(4, []));
+    assert.equal(harness.document.activeElement, harness.document.querySelector('.refresh'));
+  } finally {
+    harness.dispose();
+  }
+});
+
+void test('renders 1000 folders in cancelable chunks with busy state before the heartbeat', async () => {
+  const folders = Array.from({ length: 1_000 }, (_, index) => folder({
+    id: `folder-${index}`,
+    name: `Folder ${index}`,
+    path: `C:\\Folder${index}`,
+    conversations: [],
+  }));
+  const harness = await setup();
+  try {
+    harness.send({
+      version: PROTOCOL_VERSION,
+      revision: 1,
+      kind: 'refreshing',
+      folders,
+      message: WEBVIEW_STATE_MESSAGES.refreshing,
+      busy: true,
+    });
+    const hub = harness.document.querySelector<HTMLElement>('.hub');
+    const refresh = harness.document.querySelector<HTMLButtonElement>('.refresh');
+    assert.equal(hub?.getAttribute('aria-busy'), 'true');
+    assert.equal(refresh?.disabled, true);
+    assert.equal(harness.document.querySelector('.view-status')?.textContent, WEBVIEW_STATE_MESSAGES.refreshing);
+    assert.equal(harness.document.querySelectorAll('.folder').length, 0);
+
+    let foldersAtHeartbeat = -1;
+    await new Promise<void>((resolve) => harness.window.setTimeout(() => {
+      foldersAtHeartbeat = harness.document.querySelectorAll('.folder').length;
+      resolve();
+    }, 0));
+    assert.ok(foldersAtHeartbeat >= 0 && foldersAtHeartbeat < 1_000);
+    await waitFor(harness.window, () => harness.document.querySelectorAll('.folder').length === 1_000);
+  } finally {
+    harness.dispose();
+  }
+});
+
+void test('a newer revision cancels a stale chunked render without leaking old folders', async () => {
+  const staleFolders = Array.from({ length: 1_000 }, (_, index) => folder({
+    id: `stale-${index}`,
+    name: `Stale ${index}`,
+    path: `C:\\Stale${index}`,
+    conversations: [],
+  }));
+  const fresh = folder({ id: 'fresh', name: 'Fresh', path: 'C:\\Fresh' });
+  const harness = await setup();
+  try {
+    harness.send(ready(1, staleFolders));
+    await waitFor(harness.window, () => harness.document.querySelectorAll('.folder').length > 0);
+    assert.ok(harness.document.querySelectorAll('.folder').length < 1_000);
+    harness.send(ready(2, [fresh]));
+    await waitFor(harness.window, () => (
+      harness.document.querySelectorAll('.folder').length === 1
+      && harness.document.querySelector('.folder')?.getAttribute('data-folder-id') === 'fresh'
+    ));
+    assert.equal(harness.document.querySelectorAll('.folder').length, 1);
+    assert.equal(harness.document.querySelector('.folder')?.getAttribute('data-folder-id'), 'fresh');
+    assert.equal(harness.document.body.textContent?.includes('Stale'), false);
   } finally {
     harness.dispose();
   }
@@ -411,6 +607,31 @@ void test('recomputes nonce stylesheet badge variables on theme mutation without
     assert.notEqual(themeStyle.textContent, lightRules);
     assert.equal(harness.api.messages.length, messageCount);
     assert.match(themeStyle.textContent, /--folder-border:transparent/u);
+
+    const info = harness.document.querySelector<HTMLElement>('.info');
+    assert.ok(info);
+    const tooltipId = info.getAttribute('aria-describedby');
+    assert.ok(tooltipId);
+    const tooltip = harness.document.getElementById(tooltipId);
+    assert.ok(tooltip);
+    let ownerLeft = 20;
+    info.getBoundingClientRect = () => ({
+      x: ownerLeft, y: 10, left: ownerLeft, top: 10, right: ownerLeft + 20, bottom: 30,
+      width: 20, height: 20, toJSON: () => ({}),
+    });
+    tooltip.getBoundingClientRect = () => ({
+      x: 0, y: 0, left: 0, top: 0, right: 100, bottom: 40,
+      width: 100, height: 40, toJSON: () => ({}),
+    });
+    info.dispatchEvent(
+      new harness.window.PointerEvent('pointerover', { bubbles: true }) as unknown as Event,
+    );
+    assert.equal(tooltip.style.left, '20px');
+    ownerLeft = 80;
+    harness.document.documentElement.dataset.vscodeThemeId = 'changed-theme';
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(tooltip.style.left, '80px');
   } finally {
     harness.dispose();
   }

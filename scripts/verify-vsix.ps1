@@ -1,9 +1,21 @@
+param(
+    [string]$ArtifactPath
+)
+
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $sourceManifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'package.json') -Raw | ConvertFrom-Json
+if ($sourceManifest.version -ne '0.2.0') {
+    throw "Step 2 release requires package version 0.2.0, found $($sourceManifest.version)."
+}
 $artifactName = "$($sourceManifest.name)-$($sourceManifest.version)-win32-x64.vsix"
-$artifact = (Resolve-Path -LiteralPath (Join-Path $repositoryRoot "dist\$artifactName")).Path
+$artifactCandidate = if ([string]::IsNullOrWhiteSpace($ArtifactPath)) {
+    Join-Path $repositoryRoot "dist\$artifactName"
+} else {
+    $ArtifactPath
+}
+$artifact = (Resolve-Path -LiteralPath $artifactCandidate).Path
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [System.IO.Compression.ZipFile]::OpenRead($artifact)
@@ -15,8 +27,8 @@ try {
         'extension/LICENSE.txt',
         'extension/build/extension.js',
         'extension/build/kiloDataWorker.js',
-        'extension/build/webview.css',
-        'extension/build/webview.js',
+        'extension/build/webview/webview.css',
+        'extension/build/webview/webview.js',
         'extension/docs/release-notes.md',
         'extension/package.json',
         'extension/resources/hub.svg'
@@ -92,7 +104,7 @@ try {
         throw 'VSIX target platform is not win32-x64.'
     }
 
-    foreach ($bundleName in @('extension.js', 'kiloDataWorker.js', 'webview.js', 'webview.css')) {
+    foreach ($bundleName in @('extension.js', 'kiloDataWorker.js', 'webview/webview.js', 'webview/webview.css')) {
         $bundleEntry = $archive.GetEntry("extension/build/$bundleName")
         $bundleStream = $bundleEntry.Open()
         $sha256 = [System.Security.Cryptography.SHA256]::Create()

@@ -115,15 +115,15 @@ Gate M1: пройден. Нормативный commit Step 2: `88ea354`; produc
 
 Зависимости: M1.
 
-- [ ] Ввести минимальный browser DTO: folder ID, безопасный display name/full path, `available`, `current`, достоверный activity timestamp, monogram, color slot и максимум три display-conversation title. Не передавать raw session row, parent/archive/create metadata, executable URI или command.
-- [ ] Presenter не мутирует domain snapshot, сохраняет полный список folders, выбирает до трёх диалогов только для отображения и выдаёт детерминированный результат при перестановке входа.
-- [ ] Определять последнюю достоверную активность из conversations: invalid/missing/future timestamps становятся unknown и не вытесняют реальную прошлую активность.
-- [ ] Реализовать current resolver для ровно одного local `file` workspace без `workspaceFile`; empty/multi-root/remote/workspace-file/unsafe realpath дают `null` и диагностическую причину.
-- [ ] Сортировать current first; затем known activity descending; unknown по имени; tie-break по имени и нормализованному path/ID. Диалоги сортировать по точному времени, title и ID до ограничения трёх строк.
-- [ ] Реализовать относительные даты по локальным календарным дням, включая все границы `0/1/2/6/7/13/14/20/21/29/30/59/60/364/365`, future-today, DST, leap day и русские склонения. Clock/time zone должны быть инъецируемыми в тесте.
-- [ ] Реализовать инициалы через NFC, Unicode words и `Intl.Segmenter('ru', { granularity: 'grapheme' })`, включая fallback basename и `?`.
-- [ ] Реализовать нормализацию color key, FNV-1a по UTF-16, `% 16`, точный `slotOrder` и чистый расчёт adaptive palette/black-white initials без зависимости от current/missing/order/theme reload.
-- [ ] Сверить golden cases с `req/step2/variants/folder-colors.cjs`, не импортируя demo-файл в production.
+- [x] Ввести минимальный browser DTO: folder ID, безопасный display name/full path, `available`, `current`, достоверный activity timestamp, monogram, color slot и максимум три display-conversation title. Не передавать raw session row, parent/archive/create metadata, executable URI или command.
+- [x] Presenter не мутирует domain snapshot, сохраняет полный список folders, выбирает до трёх диалогов только для отображения и выдаёт детерминированный результат при перестановке входа.
+- [x] Определять последнюю достоверную активность из conversations: invalid/missing/future timestamps становятся unknown и не вытесняют реальную прошлую активность.
+- [x] Реализовать current resolver для ровно одного local `file` workspace без `workspaceFile`; empty/multi-root/remote/workspace-file/unsafe realpath дают `null` и диагностическую причину.
+- [x] Сортировать current first; затем known activity descending; unknown по имени; tie-break по имени и нормализованному path/ID. Диалоги сортировать по точному времени, title и ID до ограничения трёх строк.
+- [x] Реализовать относительные даты по локальным календарным дням, включая все границы `0/1/2/6/7/13/14/20/21/29/30/59/60/364/365`, future-today, DST, leap day и русские склонения. Clock/time zone должны быть инъецируемыми в тесте.
+- [x] Реализовать инициалы через NFC, Unicode words и `Intl.Segmenter('ru', { granularity: 'grapheme' })`, включая fallback basename и `?`.
+- [x] Реализовать нормализацию color key, FNV-1a по UTF-16, `% 16`, точный `slotOrder` и чистый расчёт adaptive palette/black-white initials без зависимости от current/missing/order/theme reload.
+- [x] Сверить golden cases с `req/step2/variants/folder-colors.cjs`, не импортируя demo-файл в production.
 
 Gate M2: parameterized/property unit tests покрывают PRES-02..05, MONO-01, COLOR-01..02; existing projection/data tests остаются зелёными. Никакого VS Code, DOM, I/O или timer side effect в чистых функциях.
 
@@ -131,16 +131,16 @@ Gate M2: parameterized/property unit tests покрывают PRES-02..05, MONO-
 
 Зависимости: M2.
 
-- [ ] Заменить регистрацию `TreeView` на один `registerWebviewViewProvider` с прежним view ID и нативным именем `Kilo Hub`.
-- [ ] Создать state machine initial/loading/ready/refreshing/initial-error/refresh-error-stale с точными русскими текстами и сохранением предыдущего snapshot при refresh error.
-- [ ] Host владеет полным последним корректным domain snapshot; Webview state не хранит snapshot или Kilo metadata.
-- [ ] Каждая host-публикация использует protocol version и строго монотонную revision. Browser принимает только новую revision и игнорирует duplicate/out-of-order сообщения.
-- [ ] Browser при создании отправляет разрешённый initial `refresh` как синхронизацию. Первый такой запрос возвращает retained snapshot без нового DB read, если он уже есть; при отсутствии snapshot запускает единственное первое чтение. Последующие user refresh выполняют реальное чтение.
-- [ ] Повторные refresh во время чтения объединяются; success атомарно заменяет snapshot, error сохраняет старый; stale/removed folders исчезают только после success.
-- [ ] Workspace change, successful refresh и action authorization пересчитывают current. Workspace change не читает SQLite.
-- [ ] Local-day rollover и возврат видимости/focus обновляют date labels из snapshot без чтения SQLite.
-- [ ] Strict runtime validation действует в обе стороны: plain object, exact keys, version/type, finite revision, bounded ID/string/array sizes, отсутствие лишних полей и prototype-shaped payload.
-- [ ] Dispose/revive очищает listeners/timers, сохраняет только допустимый UI state и не допускает postMessage в устаревший view.
+- [x] Заменить регистрацию `TreeView` на один `registerWebviewViewProvider` с прежним view ID и нативным именем `Kilo Hub`.
+- [x] Создать state machine initial/loading/ready/refreshing/initial-error/refresh-error-stale с точными русскими текстами и сохранением предыдущего snapshot при refresh error.
+- [x] Host владеет полным последним корректным domain snapshot; Webview state не хранит snapshot или Kilo metadata.
+- [x] Каждая host-публикация использует protocol version и строго монотонную revision. Browser принимает только новую revision и игнорирует duplicate/out-of-order сообщения.
+- [x] Browser при создании отправляет metadata-free `ready`. Host повторно публикует retained snapshot без DB read, если он уже есть; при отсутствии snapshot запускает единственное первое чтение. Последующие user refresh выполняют реальное чтение.
+- [x] Повторные refresh во время чтения объединяются; success атомарно заменяет snapshot, error сохраняет старый; stale/removed folders исчезают только после success.
+- [x] Workspace change, successful refresh и action authorization пересчитывают current. Workspace change не читает SQLite.
+- [x] Local-day rollover и возврат видимости/focus обновляют date labels из snapshot без чтения SQLite.
+- [x] Strict runtime validation действует в обе стороны: plain object, exact keys, version/type, finite revision, bounded ID/string/array sizes, отсутствие лишних полей и prototype-shaped payload.
+- [x] Dispose/revive очищает listeners/timers, сохраняет только допустимый UI state и не допускает postMessage в устаревший view.
 
 Gate M3: unit/controller tests с deferred promises проходят для initial/load/refresh/error/race/revision/dispose/revive/workspace change; один refresh соответствует максимум одному worker read.
 
@@ -148,18 +148,18 @@ Gate M3: unit/controller tests с deferred promises проходят для init
 
 Зависимости: зафиксированные DTO/protocol из M2–M3.
 
-- [ ] Собирать browser entry отдельно с `platform: browser`; bundle не импортирует `vscode`, Node built-ins, adapter, filesystem или demo assets.
-- [ ] DOM начинается со строки `Мои папки с Kilo`; DOM-дубликата `Kilo Hub` и текста `Kilo Folders` нет.
-- [ ] Рендерить loading/empty/ready/refreshing/error/stale, полный список folders и таблицу действий current/missing с точными текстами.
-- [ ] Создавать пользовательский текст только через `textContent`; conversations пассивны, имеют видимый ellipsis и полный visually-hidden текст ровно один раз в accessibility tree.
-- [ ] Рендер большого snapshot выполнять порциями с event-loop yield; индикатор busy появляется до тяжёлой обработки.
-- [ ] Реализовать accordion «не более одного», повторное закрытие, последнее намерение, Enter/Space, `aria-expanded`/`aria-controls`, `inert`/`aria-hidden`, безопасный focus и 320 ms cubic easing.
-- [ ] Реализовать scroll compensation для середины/начала/конца списка; reduced motion через VS Code class и media query даёт duration 0, но сохраняет итог/focus/scroll invariants.
-- [ ] Реализовать единый доступный tooltip-controller по УТЗ-05: hover и keyboard focus, popup hover, grace 120 ms, Escape/dismiss reset, стабильные ID/`aria-describedby`, один popup одновременно и отсутствие отдельных date/missing owners.
-- [ ] Позиционировать tooltip внутри viewport с отступом 8 CSSpx, переносом вверх, `330/360px` limits, scroll/resize/zoom reposition и доступной прокруткой длинного текста.
-- [ ] Восстанавливать expanded ID, scroll и разумный focus только если folder ещё существует; удалённый target сбрасывать на видимый безопасный элемент.
-- [ ] Перенести нормативные размеры/геометрию из `design-size-spec.md` в production CSS без demo shell, `demo-themes.css`, font shrink и inverse zoom.
-- [ ] Использовать semantic `--vscode-*`, forced colors и вычисляемые monogram colors; theme mutation не меняет path→slot и не требует reload.
+- [x] Собирать browser entry отдельно с `platform: browser`; bundle не импортирует `vscode`, Node built-ins, adapter, filesystem или demo assets.
+- [x] DOM начинается со строки `Мои папки с Kilo`; DOM-дубликата `Kilo Hub` и текста `Kilo Folders` нет.
+- [x] Рендерить loading/empty/ready/refreshing/error/stale, полный список folders и таблицу действий current/missing с точными текстами.
+- [x] Создавать пользовательский текст только через `textContent`; conversations пассивны, имеют видимый ellipsis и полный visually-hidden текст ровно один раз в accessibility tree.
+- [x] Рендер большого snapshot выполнять порциями с event-loop yield; индикатор busy появляется до тяжёлой обработки.
+- [x] Реализовать accordion «не более одного», повторное закрытие, последнее намерение, Enter/Space, `aria-expanded`/`aria-controls`, `inert`/`aria-hidden`, безопасный focus и 320 ms cubic easing.
+- [x] Реализовать scroll compensation для середины/начала/конца списка; reduced motion через VS Code class и media query даёт duration 0, но сохраняет итог/focus/scroll invariants.
+- [x] Реализовать единый доступный tooltip-controller по УТЗ-05: hover и keyboard focus, popup hover, grace 120 ms, Escape/dismiss reset, стабильные ID/`aria-describedby`, один popup одновременно и отсутствие отдельных date/missing owners.
+- [x] Позиционировать tooltip внутри viewport с отступом 8 CSSpx, переносом вверх, `330/360px` limits, scroll/resize/zoom reposition и доступной прокруткой длинного текста.
+- [x] Восстанавливать opaque expanded key, scroll и разумный focus только если folder ещё существует; удалённый target сбрасывать на видимый безопасный элемент.
+- [x] Перенести нормативные размеры/геометрию из `design-size-spec.md` в production CSS без demo shell, `demo-themes.css`, font shrink и inverse zoom.
+- [x] Использовать semantic `--vscode-*`, forced colors и вычисляемые monogram colors; theme mutation не меняет path→slot и не требует reload.
 
 Gate M4: component suite проходит DOM/keyboard/focus/tooltip/accordion/theme/hostile-string contracts; CSS/source contract проверен при B=13/16/20 и 260/320/400. Фактическая геометрия, zoom, contrast и screen reader остаются pending до installed manual gate.
 
@@ -167,14 +167,14 @@ Gate M4: component suite проходит DOM/keyboard/focus/tooltip/accordion/t
 
 Зависимости: M3 и M4.
 
-- [ ] Разрешить Webview → host только `refresh`, `openHere`, `openNewWindow`, `revealInExplorer`; action содержит folder ID и revision, но не path/URI/command.
-- [ ] Перед каждым действием проверить protocol, совпадение revision/current snapshot, существование ID, таблицу current/missing, повторный current resolver и свежий `stat`/`realpath` path-safety check.
-- [ ] Получать URI только из host snapshot. Forged/stale/oversize/extra-field/invalid-state messages не вызывают API, DB read или произвольную команду.
-- [ ] Сохранить exact adapters: `vscode.openFolder` + `forceReuseWindow`, `vscode.openFolder` + `forceNewWindow`, проверенный Explorer adapter.
-- [ ] Существующие command IDs либо проходят тот же authorizer с host-only reference, либо отклоняют внешний непроверенный аргумент; скрытие кнопки никогда не является authorization.
-- [ ] Генерировать HTML с криптографическим nonce, локальными `asWebviewUri`, минимальным `localResourceRoots` и CSP `default-src 'none'` с только реально нужными directives.
-- [ ] Не использовать inline script, `eval`, network/connect sources или внешние ресурсы. Способ динамического позиционирования tooltip должен пройти CSP test без скрытого ослабления политики.
-- [ ] Проверить XSS payload, quotes, bidi/control, `javascript:`, malformed objects и oversized payload; ошибки для UI санитизируются, technical detail остаётся в Output `Kilo Hub`.
+- [x] Разрешить Webview → host только metadata-free `ready`, `refresh` и `folderAction` с `openHere | openNewWindow | revealInExplorer`; action содержит folder ID и revision, но не path/URI/command.
+- [x] Перед каждым действием проверить protocol, совпадение revision/current snapshot, существование ID, таблицу current/missing, повторный current resolver и свежий `stat`/`realpath` path-safety check.
+- [x] Получать URI только из host snapshot. Forged/stale/oversize/extra-field/invalid-state messages не вызывают API, DB read или произвольную команду.
+- [x] Сохранить exact adapters: `vscode.openFolder` + `forceReuseWindow`, `vscode.openFolder` + `forceNewWindow`, проверенный Explorer adapter.
+- [x] Существующие command IDs либо проходят тот же authorizer с host-only reference, либо отклоняют внешний непроверенный аргумент; скрытие кнопки никогда не является authorization.
+- [x] Генерировать HTML с криптографическим nonce, локальными `asWebviewUri`, минимальным `localResourceRoots` и CSP `default-src 'none'` с только реально нужными directives.
+- [x] Не использовать inline script, `eval`, network/connect sources или внешние ресурсы. Способ динамического позиционирования tooltip проходит CSP test без скрытого ослабления script policy.
+- [x] Проверить XSS payload, quotes, bidi/control, `javascript:`, malformed objects и oversized payload; ошибки для UI санитизируются, technical detail остаётся в Output `Kilo Hub`.
 
 Gate M5: negative authorization/fuzz/XSS/CSP tests доказывают отсутствие side effects; exact HTML/CSP parser и bundle scan не находят запрещённых sources/API. Все три реальные команды пока считаются автоматизированно проверенными только на уровне exact API arguments и authorization, не GUI-результата.
 
@@ -182,14 +182,14 @@ Gate M5: negative authorization/fuzz/XSS/CSP tests доказывают отсу
 
 Зависимости: M2–M5.
 
-- [ ] Обновить `package.json`: version `0.2.0`, view `type: "webview"`, name `Kilo Hub`, отсутствие старого view-title refresh, только заявленные команды и прежний `extensionKind: ["ui"]`.
-- [ ] Расширить TypeScript/build/lint/test scripts для browser и component tests, не ослабляя strict TypeScript или ESLint.
-- [ ] Сохранить все Step 1 adapter/projection/path/read-only/WAL/busy/event-loop tests как regressions.
+- [x] Обновить `package.json`: version `0.2.0`, view `type: "webview"`, name `Kilo Hub`, отсутствие старого view-title refresh, только заявленные команды и прежний `extensionKind: ["ui"]`.
+- [x] Расширить TypeScript/build/lint/test scripts для browser и component tests, не ослабляя strict TypeScript или ESLint.
+- [x] Сохранить все Step 1 adapter/projection/path/read-only/WAL/busy/event-loop tests как regressions.
 - [ ] Покрыть все строки `req/step2/03-test-matrix.md` ссылкой на automated test либо явный manual ID; отсутствие публичного API не заменять фиктивным unit test.
-- [ ] Добавить 1000-session regression: все folders/sort/limit/actions/revision верны, worker и browser render дают event-loop heartbeat, parallel reads отсутствуют. Время записать диагностически без нового pass/fail SLA.
-- [ ] Проверить exact manifest/activation/command surface и отсутствие TreeView contract.
-- [ ] Проверить development Extension Host на VS Code `1.105.1`: activation, Webview provider, initial synchronization, worker refresh и неизменность fixture DB.
-- [ ] Выполнить `npm audit --audit-level=high`, `npm run check-types`, `npm run lint`, unit, component, integration и общий `npm test`.
+- [x] Добавить 1000-session regression: все folders/sort/limit/actions/revision верны, worker и browser render дают event-loop heartbeat, parallel reads отсутствуют. Время записать диагностически без нового pass/fail SLA.
+- [x] Проверить exact manifest/activation/command surface и отсутствие TreeView contract.
+- [x] Проверить development Extension Host на VS Code `1.105.1` и Current Stable `1.138.0`: activation, browser-ready handshake, Webview provider, worker refresh и неизменность fixture DB.
+- [x] Выполнить `npm audit --audit-level=high`, `npm run check-types`, `npm run lint`, unit, component, integration и общий `npm test`.
 
 Gate M6: полный suite зелёный из clean checkout; traceability не содержит строк без automated/manual disposition; production bundles не содержат fixtures/demo/requirements/source maps/network code.
 
@@ -215,7 +215,7 @@ Gate M7: цикл повторяется до `Blocker=0`, `High=0`; кажды�
 Зависимости: зелёный M6 и текущий review candidate M7.
 
 - [ ] До release commit подготовить русские release notes и manifest `0.2.0`; выполнить status/diff/log, закоммитить только целевые проверенные файлы.
-- [ ] Обновить build до exact outputs: `build/extension.js`, `build/kiloDataWorker.js`, production browser JS и CSS. Source maps и demo assets не генерировать для package.
+- [ ] Обновить build до exact outputs: `build/extension.js`, `build/kiloDataWorker.js`, `build/webview/webview.js`, `build/webview/webview.css`. Source maps и demo assets не генерировать для package.
 - [ ] Обновить положительный `files` allow-list и exact verifier для полного списка entries, identity/version/target/engine, Webview contribution, CSP assets и SHA-256 каждого build output.
 - [ ] Добавить negative verifier tests: лишний, отсутствующий и stale/mutated asset должны отклоняться.
 - [ ] Из чистого checkout выполнить два независимых цикла `npm ci` → `npm run clean` → full test → `npm run package`; оба раза получить байт-в-байт одинаковый `dist/kilo-hub-0.2.0-win32-x64.vsix`.

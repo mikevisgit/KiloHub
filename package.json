@@ -9,7 +9,7 @@
   "packageManager": "npm@11.6.2",
   "engines": {
     "vscode": "^1.105.1",
-    "node": ">=22.20.0 <25"
+    "node": ">=22.19.0 <25"
   },
   "categories": [
     "Other"
@@ -25,7 +25,7 @@
   "files": [
     "LICENSE.txt",
     "build/*.js",
-    "build/*.css",
+    "build/webview/*",
     "docs/release-notes.md",
     "resources/**"
   ],
@@ -90,14 +90,22 @@
     "check-types": "tsc --noEmit",
     "lint": "eslint src tests scripts",
     "bundle": "node scripts/build.mjs",
+    "verify:webview-bundle": "node scripts/verify-webview-bundle.mjs",
     "build:tests": "tsc -p tsconfig.tests.json",
     "test:unit": "npm run build:tests && node scripts/run-unit-tests.mjs",
     "test:component": "npm run build:tests && node scripts/run-component-tests.mjs",
-    "test:integration": "npm run bundle && npm run build:tests && node scripts/run-extension-tests.mjs",
-    "test:installed": "npm run bundle && npm run build:tests && node scripts/run-installed-extension-tests.mjs",
+    "test:integration": "npm run test:integration:min",
+    "test:integration:min": "npm run bundle && npm run verify:webview-bundle && npm run build:tests && node scripts/run-extension-tests.mjs 1.105.1",
+    "test:integration:current": "npm run bundle && npm run verify:webview-bundle && npm run build:tests && node scripts/run-extension-tests.mjs stable",
+    "test:installed": "npm run test:installed:min",
+    "test:installed:min": "npm run bundle && npm run build:tests && node scripts/run-installed-extension-tests.mjs 1.105.1",
+    "test:installed:current": "npm run bundle && npm run build:tests && node scripts/run-installed-extension-tests.mjs stable",
     "test": "npm run check-types && npm run lint && npm run test:unit && npm run test:component && npm run test:integration",
     "verify:vsix": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-vsix.ps1",
-    "package": "npm run bundle && node scripts/package.mjs && npm run verify:vsix"
+    "test:verify-vsix-negative": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-vsix-verifier.ps1",
+    "package": "npm run bundle && node scripts/package.mjs && npm run verify:vsix",
+    "package:repro": "node scripts/verify-reproducible-package.mjs",
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
