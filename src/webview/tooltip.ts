@@ -1,7 +1,6 @@
 export const TOOLTIP_GRACE_MS = 120;
 export const TOOLTIP_VIEWPORT_MARGIN = 8;
 export const TOOLTIP_MAX_WIDTH = 330;
-export const TOOLTIP_MAX_HEIGHT = 360;
 
 const TOOLTIP_GAP = 4;
 
@@ -30,7 +29,6 @@ interface TooltipEntry {
   readonly originalDescription: string | null;
   sourceHovered: boolean;
   sourceFocused: boolean;
-  popupHovered: boolean;
   dismissed: boolean;
   activity: number;
 }
@@ -73,7 +71,6 @@ export class TooltipController {
   readonly #viewport: () => { readonly width: number; readonly height: number };
   readonly #tooltipClassName: string;
   readonly #owners = new Map<HTMLElement, TooltipEntry>();
-  readonly #popups = new Map<HTMLElement, TooltipEntry>();
   #visible: TooltipEntry | null = null;
   #hideTimer: number | null = null;
   #activity = 0;
@@ -81,15 +78,6 @@ export class TooltipController {
 
   readonly #onPointerOver = (event: Event): void => {
     const pointerEvent = event as PointerEvent;
-    const popup = this.#findPopup(pointerEvent.target);
-    if (popup !== null) {
-      if (!popup.popupHovered) {
-        popup.popupHovered = true;
-        this.#activate(popup);
-      }
-      return;
-    }
-
     const owner = this.#findOwner(pointerEvent.target);
     if (owner === null || this.#findOwner(pointerEvent.relatedTarget) === owner) {
       return;
@@ -101,41 +89,22 @@ export class TooltipController {
         this.#resetDismissalWhenInactive(entry);
       }
     }
+    const wasInactive = !this.#isInteracting(owner);
     owner.sourceHovered = true;
+    if (wasInactive) {
+      owner.dismissed = false;
+    }
     this.#activate(owner);
   };
 
   readonly #onPointerOut = (event: Event): void => {
     const pointerEvent = event as PointerEvent;
-    const popup = this.#findPopup(pointerEvent.target);
-    if (popup !== null) {
-      if (this.#findPopup(pointerEvent.relatedTarget) === popup) {
-        return;
-      }
-      popup.popupHovered = false;
-      const owner = this.#findOwner(pointerEvent.relatedTarget);
-      if (owner !== null) {
-        owner.sourceHovered = true;
-        this.#activate(owner);
-      } else {
-        this.#afterInteractionChanged(popup);
-      }
-      return;
-    }
-
     const owner = this.#findOwner(pointerEvent.target);
     if (owner === null || this.#findOwner(pointerEvent.relatedTarget) === owner) {
       return;
     }
 
     owner.sourceHovered = false;
-    const popupUnderPointer = this.#findPopup(pointerEvent.relatedTarget);
-    if (popupUnderPointer === owner) {
-      owner.popupHovered = true;
-      this.#activate(owner);
-      return;
-    }
-
     const nextOwner = this.#findOwner(pointerEvent.relatedTarget);
     if (nextOwner !== null) {
       nextOwner.sourceHovered = true;
@@ -176,6 +145,27 @@ export class TooltipController {
     keyboardEvent.preventDefault();
   };
 
+  readonly #onPointerMove = (event: Event): void => {
+    const entry = this.#visible;
+    if (entry === null || entry.tooltip.hidden) {
+      return;
+    }
+
+    const pointerEvent = event as PointerEvent;
+    const rect = entry.tooltip.getBoundingClientRect();
+    if (
+      (rect.width > 0 || rect.height > 0)
+      && pointerEvent.clientX >= rect.left
+      && pointerEvent.clientX <= rect.right
+      && pointerEvent.clientY >= rect.top
+      && pointerEvent.clientY <= rect.bottom
+    ) {
+      entry.dismissed = true;
+      this.#cancelHide();
+      this.#hideVisible();
+    }
+  };
+
   readonly #onViewportChanged = (): void => {
     this.reposition();
   };
@@ -200,6 +190,7 @@ export class TooltipController {
     panel.addEventListener('focusin', this.#onFocusIn);
     panel.addEventListener('focusout', this.#onFocusOut);
     panel.ownerDocument.addEventListener('keydown', this.#onKeyDown);
+    panel.ownerDocument.addEventListener('pointermove', this.#onPointerMove, true);
     panel.addEventListener('scroll', this.#onViewportChanged, true);
     environment.addEventListener('scroll', this.#onViewportChanged, true);
     environment.addEventListener('resize', this.#onViewportChanged);
@@ -225,8 +216,8 @@ export class TooltipController {
     tooltip.hidden = true;
     tooltip.textContent = text;
     tooltip.style.position = 'fixed';
-    tooltip.style.pointerEvents = 'auto';
-    tooltip.style.overflow = 'auto';
+    tooltip.style.pointerEvents = 'none';
+    tooltip.style.overflow = 'visible';
     tooltip.style.overflowWrap = 'anywhere';
     tooltip.style.width = 'max-content';
 
@@ -241,12 +232,10 @@ export class TooltipController {
       originalDescription,
       sourceHovered: false,
       sourceFocused: false,
-      popupHovered: false,
       dismissed: false,
       activity: 0,
     };
     this.#owners.set(owner, entry);
-    this.#popups.set(tooltip, entry);
 
     let registered = true;
     return {
@@ -281,21 +270,17 @@ export class TooltipController {
     const width = Math.max(0, viewport.width);
     const height = Math.max(0, viewport.height);
     const widthLimit = Math.max(0, Math.min(TOOLTIP_MAX_WIDTH, width - TOOLTIP_VIEWPORT_MARGIN * 2));
-    const heightLimit = Math.max(0, Math.min(TOOLTIP_MAX_HEIGHT, height - TOOLTIP_VIEWPORT_MARGIN * 2));
     const tooltip = entry.tooltip;
     tooltip.style.maxWidth = `${widthLimit}px`;
-    tooltip.style.maxHeight = `${heightLimit}px`;
+    tooltip.style.maxHeight = 'none';
 
     const ownerRect = entry.owner.getBoundingClientRect();
-    let tooltipRect = tooltip.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
     const measuredWidth = Math.min(
       widthLimit,
       tooltipRect.width || tooltip.offsetWidth || tooltip.scrollWidth || widthLimit,
     );
-    const measuredHeight = Math.min(
-      heightLimit,
-      tooltipRect.height || tooltip.offsetHeight || tooltip.scrollHeight || heightLimit,
-    );
+    const measuredHeight = tooltipRect.height || tooltip.offsetHeight || tooltip.scrollHeight;
     const spaceBelow = Math.max(
       0,
       height - TOOLTIP_VIEWPORT_MARGIN - ownerRect.bottom - TOOLTIP_GAP,
@@ -305,16 +290,7 @@ export class TooltipController {
       ownerRect.top - TOOLTIP_VIEWPORT_MARGIN - TOOLTIP_GAP,
     );
     const useAbove = measuredHeight > spaceBelow && spaceAbove > spaceBelow;
-    const sideSpace = useAbove ? spaceAbove : spaceBelow;
-    if (sideSpace > 0) {
-      tooltip.style.maxHeight = `${Math.min(heightLimit, sideSpace)}px`;
-      tooltipRect = tooltip.getBoundingClientRect();
-    }
-
-    const renderedHeight = Math.min(
-      Number.parseFloat(tooltip.style.maxHeight) || heightLimit,
-      tooltipRect.height || tooltip.offsetHeight || tooltip.scrollHeight || measuredHeight,
-    );
+    const renderedHeight = measuredHeight;
     const renderedWidth = Math.min(
       widthLimit,
       tooltipRect.width || tooltip.offsetWidth || tooltip.scrollWidth || measuredWidth,
@@ -340,6 +316,7 @@ export class TooltipController {
     this.#panel.removeEventListener('focusin', this.#onFocusIn);
     this.#panel.removeEventListener('focusout', this.#onFocusOut);
     this.#panel.ownerDocument.removeEventListener('keydown', this.#onKeyDown);
+    this.#panel.ownerDocument.removeEventListener('pointermove', this.#onPointerMove, true);
     this.#panel.removeEventListener('scroll', this.#onViewportChanged, true);
     this.#environment.removeEventListener('scroll', this.#onViewportChanged, true);
     this.#environment.removeEventListener('resize', this.#onViewportChanged);
@@ -415,18 +392,6 @@ export class TooltipController {
     return null;
   }
 
-  #findPopup(target: EventTarget | null): TooltipEntry | null {
-    let element = this.#asElement(target);
-    while (element !== null && this.#panel.contains(element)) {
-      const entry = this.#popups.get(element as HTMLElement);
-      if (entry !== undefined) {
-        return entry;
-      }
-      element = element.parentElement;
-    }
-    return null;
-  }
-
   #asElement(target: EventTarget | null): Element | null {
     if (target === null || typeof (target as Element).parentElement === 'undefined') {
       return null;
@@ -435,7 +400,7 @@ export class TooltipController {
   }
 
   #isInteracting(entry: TooltipEntry): boolean {
-    return entry.sourceHovered || entry.sourceFocused || entry.popupHovered;
+    return entry.sourceHovered || entry.sourceFocused;
   }
 
   #resetDismissalWhenInactive(entry: TooltipEntry): void {
@@ -446,7 +411,6 @@ export class TooltipController {
 
   #hideVisible(): void {
     if (this.#visible !== null) {
-      this.#visible.popupHovered = false;
       this.#visible.tooltip.hidden = true;
       this.#visible = null;
     }
@@ -463,7 +427,6 @@ export class TooltipController {
     if (!this.#owners.delete(entry.owner)) {
       return;
     }
-    this.#popups.delete(entry.tooltip);
     if (this.#visible === entry) {
       this.#hideVisible();
     }

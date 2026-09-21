@@ -398,7 +398,11 @@ void test('uses text-only DOM and exposes full passive conversation text once to
     assert.equal(conversation.querySelector('[aria-hidden="true"]')?.textContent, hostileTitle);
     assert.equal(conversation.querySelector('.sr-only')?.textContent, hostileTitle);
     assert.equal(element.querySelectorAll('.conversation .sr-only').length, 1);
-    assert.equal(element.querySelector('.history-title')?.tagName, 'H2');
+    const historyTitle = element.querySelector<HTMLElement>('.history-title');
+    assert.equal(historyTitle?.tagName, 'H2');
+    assert.equal(historyTitle?.hasAttribute('tabindex'), false);
+    assert.equal(historyTitle?.hasAttribute('aria-describedby'), false);
+    assert.equal(conversation.querySelector('.conversation-visible')?.hasAttribute('aria-describedby'), false);
   } finally {
     harness.dispose();
   }

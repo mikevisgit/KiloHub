@@ -69,6 +69,7 @@ void test('focus, forced-colors, reduced-motion and panel edge contracts are pre
   assert.match(css, /\[hidden\]\s*\{[^}]*display:\s*none\s*!important;/su);
   assert.doesNotMatch(css, /\.hub\s*\{[^}]*border:/su);
   assert.match(css, /\.folder\s*\{[^}]*border:\s*1px solid var\(--hub-card-border\);/su);
+  assert.match(css, /\.tooltip\s*\{[^}]*pointer-events:\s*none;/su);
   assert.doesNotMatch(css, /\.folder\s*\{[^}]*overflow:\s*(?:clip|hidden)/su);
   assert.match(css, /\.folder-head:focus-visible[\s\S]*outline-offset:\s*-3px;/u);
   assert.match(css, /@media\s*\(forced-colors:\s*active\)[\s\S]*CanvasText[\s\S]*Highlight/u);

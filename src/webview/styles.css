@@ -336,17 +336,16 @@ button {
   z-index: 20;
   width: max-content;
   max-width: min(330px, calc(100vw - 16px));
-  max-height: min(360px, calc(100vh - 16px));
+  max-height: none;
   padding: calc(var(--hub-base) * 0.6153846154) var(--hub-row-x);
-  overflow: auto;
-  overscroll-behavior: contain;
+  overflow: visible;
   border: 1px solid var(--hub-focus);
   background: var(--hub-bg);
   box-shadow: 0 2px 8px #0004;
   color: var(--hub-fg);
   line-height: 1.45;
   overflow-wrap: anywhere;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .tooltip[hidden] {

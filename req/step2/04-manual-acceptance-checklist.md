@@ -15,7 +15,7 @@
 | Роль исполнителя | |
 | Source commit, полный SHA | |
 | Git status исходного checkout | |
-| VSIX path | `dist/kilo-hub-0.2.0-win32-x64.vsix` |
+| VSIX path | `dist/kilo-hub-0.2.2-win32-x64.vsix` |
 | VSIX SHA-256 | |
 | Размер VSIX, bytes | |
 | Результат exact verifier | |
@@ -39,9 +39,9 @@
 
 | ID | Действие и ожидаемый результат | Evidence | Результат | Исполнитель |
 | --- | --- | --- | --- | --- |
-| M-PKG-01 | SHA-256 вычислен после exact verifier; имя/manifest version равны `0.2.0`, target `win32-x64`; hash совпадает во всех дальнейших отчётах. | | | |
+| M-PKG-01 | SHA-256 вычислен после exact verifier; имя/manifest version равны `0.2.2`, target `win32-x64`; hash совпадает во всех дальнейших отчётах. | | | |
 | M-PKG-02 | Exact verifier подтверждает полный allow-list, hashes host/browser assets и отсутствие demo/tests/fixtures/requirements/reviews/source maps/DB sidecars. | | | |
-| M-PKG-03 | VSIX установлен с `--force` в пустые изолированные `--user-data-dir` и `--extensions-dir`; список extensions показывает ровно ожидаемый identity `@0.2.0`. | | | |
+| M-PKG-03 | VSIX установлен с `--force` в пустые изолированные `--user-data-dir` и `--extensions-dir`; список extensions показывает ровно ожидаемый identity `@0.2.2`. | | | |
 | M-PKG-04 | После restart VS Code Hub активируется, browser assets загружаются без blank view, 404, CSP error и внешних network requests. | | | |
 | M-PKG-05 | Packaged worker выполняет первый metadata-only refresh; Output не содержит activation/runtime error. | | | |
 
@@ -54,7 +54,7 @@
 | M-SCALE-01 | 260 CSSpx / 100% | Ровно две верхние строки: native `Kilo Hub` и `Мои папки с Kilo`; нет `Kilo Folders` и DOM-дубликата; горизонтальной прокрутки нет. | | | |
 | M-SCALE-02 | 320 CSSpx / 100% | Имя имеет приоритет, длинное имя переносится, дата/current/missing читаемы, диалог ellipsis, кнопки не обрезаны. | | | |
 | M-SCALE-03 | 400 CSSpx / 100% | Геометрия соответствует утверждённым монограммам, размеры не растянуты искусственно, список использует доступную высоту. | | | |
-| M-SCALE-04 | 260 CSSpx / 200% | Нет горизонтального scroll; контент остаётся доступен вертикальной прокруткой; focus и tooltip помещаются внутри Webview. | | | |
+| M-SCALE-04 | 260 CSSpx / 200% | Нет горизонтального scroll; контент остаётся доступен вертикальной прокруткой; focus не обрезан, tooltip не имеет внутреннего height clipping и сохраняет полный ARIA-текст при физическом clipping Webview. | | | |
 | M-SCALE-05 | 320 CSSpx / 200% | Длинные имя/path/title доступны, карточки и кнопки не перекрываются. | | | |
 | M-SCALE-06 | 400 CSSpx / 200% | Нет inverse zoom/font shrink; порядок, Tab и scroll сохраняются. | | | |
 | M-SCALE-07 | Все ширины при зафиксированном Windows scaling | Фактический scaling записан; glyph, scrollbar и focus не обрезаны. | | | |
@@ -84,7 +84,7 @@
 | M-DATE-02 | Known timestamps идут по точному времени, unknown после known; равные элементы имеют стабильный порядок до/после refresh. | | | |
 | M-MONO-01 | Инициалы соответствуют имени, имя объявляется отдельно, decorative badge не дублируется screen reader; одна папка сохраняет цвет при refresh/status/theme changes. | | | |
 | M-HISTORY-01 | В раскрытии показано не более трёх последних title, новые выше; пустой title=`Без названия`; строки пассивны и Enter их не открывает. | | | |
-| M-HISTORY-02 | Длинный title ellipsis, полный title доступен через tooltip; нет marker/date/button styling/hover action. | | | |
+| M-HISTORY-02 | Длинный title имеет ellipsis; у заголовка и названий нет tooltip, `tabindex` и hover action; полный title остаётся доступен screen reader один раз. | | | |
 | M-MISSING-01 | Missing остаётся в истории с одной пометкой `Папка не найдена`, path tooltip и диалогами; нет действий, actions container, лишнего отступа или разделителя. | | | |
 | M-MISSING-02 | Сочетание current+missing следует missing: нет ни одной action; состояние понятно без цвета. | | | |
 
@@ -108,18 +108,18 @@ NVDA запускается до открытия Hub. Фиксируются д
 
 ## Tooltip
 
-УТЗ-05 имеет приоритет над hover-only поведением старого макета.
+УТЗ-09 имеет приоритет над удержанием popup из УТЗ-05 и прежним набором tooltip owners.
 
 | ID | Сценарий и ожидаемый результат | Evidence | Результат | Исполнитель |
 | --- | --- | --- | --- | --- |
 | M-TIP-01 | Hover path owner: полный path показан немедленно; движение между icon/name/date/current/missing внутри одного head не перезапускает и не меняет tooltip. | | | |
 | M-TIP-02 | Keyboard focus path owner: тот же path доступен без мыши и имеет устойчивую ARIA-связь. | | | |
-| M-TIP-03 | Перевести pointer с owner на popup: popup остаётся видимым и читаемым; взаимодействие не вызывает underlying action. | | | |
-| M-TIP-04 | Escape: popup закрывается, ARIA state очищается, focus остаётся на source. | | | |
-| M-TIP-05 | Уход source/popup и потеря focus после завершения взаимодействия закрывают popup без зависшего owner. | | | |
-| M-TIP-06 | Path/info/refresh/три actions/history/title имеют точные тексты; date и missing не создают отдельные tooltip. | | | |
-| M-TIP-07 | Owner у правого/нижнего края, width 260 и zoom 200%: popup остаётся в доступной области Webview и полный текст можно прочитать. | | | |
-| M-TIP-08 | Scroll/resize/theme change при открытом tooltip: позиция корректируется, popup не отделяется от source и не обрезает обязательный текст. | | | |
+| M-TIP-03 | Перевести pointer в прямоугольник popup: popup исчезает немедленно, не перехватывает pointer/click и не появляется повторно до реального ухода и нового входа в owner. | | | |
+| M-TIP-04 | Escape: popup закрывается, устойчивый `aria-describedby` сохраняется, focus остаётся на source. | | | |
+| M-TIP-05 | Уход source и потеря focus после завершения взаимодействия закрывают popup без зависшего owner. | | | |
+| M-TIP-06 | Path/info/refresh/три actions имеют точные тексты; history/title/date/missing не создают tooltip. | | | |
+| M-TIP-07 | Owner у правого/нижнего края, width 260 и zoom 200%: popup позиционируется с viewport margin, не имеет внутреннего height clipping; физически обрезанный Webview текст полностью доступен через ARIA source. | | | |
+| M-TIP-08 | Scroll/resize/theme change при открытом tooltip: позиция корректируется, popup не получает внутреннего height clipping; физическое clipping Webview соответствует M-TIP-07. | | | |
 
 ## Аккордеон, motion, scroll и focus
 

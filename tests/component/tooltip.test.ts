@@ -65,8 +65,9 @@ function pointerEvent(
   window: HappyWindow,
   type: string,
   relatedTarget: EventTarget | null = null,
+  coordinates: { readonly clientX: number; readonly clientY: number } = { clientX: 0, clientY: 0 },
 ): PointerEvent {
-  const event = new window.PointerEvent(type, { bubbles: true });
+  const event = new window.PointerEvent(type, { bubbles: true, ...coordinates });
   Object.defineProperty(event, 'relatedTarget', { configurable: true, value: relatedTarget });
   return event as unknown as PointerEvent;
 }
@@ -128,7 +129,7 @@ void test('tooltip nodes and aria descriptions remain stable while only one popu
   assert.equal(second.hasAttribute('aria-describedby'), false);
 });
 
-void test('pointer-popup grace is exactly 120ms and focus keeps the tooltip open', async () => {
+void test('pointer entering popup geometry hides immediately and stays dismissed until owner reentry', async () => {
   const { window, panel, timers } = await setup();
   const owner = window.document.createElement('button') as unknown as HTMLElement;
   panel.append(owner);
@@ -136,32 +137,50 @@ void test('pointer-popup grace is exactly 120ms and focus keeps the tooltip open
     environment: window as unknown as globalThis.Window,
   });
   const { tooltip } = controller.register(owner, 'Длинное пояснение');
+  tooltip.getBoundingClientRect = () => domRect(20, 30, 100, 50);
 
   assert.equal(TOOLTIP_GRACE_MS, 120);
+  assert.equal(tooltip.style.pointerEvents, 'none');
   owner.dispatchEvent(pointerEvent(window, 'pointerover'));
-  owner.dispatchEvent(pointerEvent(window, 'pointerout', tooltip));
-  tooltip.dispatchEvent(pointerEvent(window, 'pointerover', owner));
   assert.equal(tooltip.hidden, false);
 
-  tooltip.dispatchEvent(pointerEvent(window, 'pointerout'));
-  timers.tick(119);
+  owner.dispatchEvent(pointerEvent(window, 'pointerout'));
+  (window.document.body as unknown as HTMLElement).dispatchEvent(pointerEvent(
+    window,
+    'pointermove',
+    null,
+    { clientX: 19, clientY: 30 },
+  ));
   assert.equal(tooltip.hidden, false);
-  timers.tick(1);
+  (window.document.body as unknown as HTMLElement).dispatchEvent(pointerEvent(
+    window,
+    'pointermove',
+    null,
+    { clientX: 20, clientY: 30 },
+  ));
   assert.equal(tooltip.hidden, true);
 
-  owner.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }) as unknown as FocusEvent);
-  assert.equal(tooltip.hidden, false, 'keyboard focus shows immediately');
   owner.dispatchEvent(pointerEvent(window, 'pointerover'));
-  owner.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true }) as unknown as FocusEvent);
-  assert.equal(tooltip.hidden, false, 'hover survives focus loss');
+  assert.equal(tooltip.hidden, false, 'one real reentry clears dismissal after pointerout happened first');
+
+  (window.document.body as unknown as HTMLElement).dispatchEvent(pointerEvent(
+    window,
+    'pointermove',
+    null,
+    { clientX: 20, clientY: 30 },
+  ));
+  assert.equal(tooltip.hidden, true);
+  owner.dispatchEvent(pointerEvent(window, 'pointerover'));
+  assert.equal(tooltip.hidden, true, 'underlying owner cannot revive a popup while hover remains active');
   owner.dispatchEvent(pointerEvent(window, 'pointerout'));
   timers.tick(120);
-  assert.equal(tooltip.hidden, true);
+  owner.dispatchEvent(pointerEvent(window, 'pointerover'));
+  assert.equal(tooltip.hidden, false, 'real leave and reentry clears dismissal');
 
   controller.dispose();
 });
 
-void test('Escape remains latched until pointer, popup and focus have all left', async () => {
+void test('Escape remains latched until pointer and focus have both left', async () => {
   const { window, panel, timers } = await setup();
   const owner = window.document.createElement('button') as unknown as HTMLElement;
   panel.append(owner);
@@ -211,7 +230,7 @@ void test('document Escape dismisses a hover-only tooltip and disposal removes t
   assert.equal(afterDispose.defaultPrevented, false);
 });
 
-void test('switching from popup hover to another focused owner cannot revive the stale popup', async () => {
+void test('switching from geometrically dismissed popup to another focused owner cannot revive it', async () => {
   const { window, panel, timers } = await setup();
   const first = window.document.createElement('button') as unknown as HTMLElement;
   const second = window.document.createElement('button') as unknown as HTMLElement;
@@ -221,10 +240,15 @@ void test('switching from popup hover to another focused owner cannot revive the
   });
   const firstRegistration = controller.register(first, 'Первый');
   const secondRegistration = controller.register(second, 'Второй');
+  firstRegistration.tooltip.getBoundingClientRect = () => domRect(10, 10, 60, 30);
 
   first.dispatchEvent(pointerEvent(window, 'pointerover'));
-  first.dispatchEvent(pointerEvent(window, 'pointerout', firstRegistration.tooltip));
-  firstRegistration.tooltip.dispatchEvent(pointerEvent(window, 'pointerover', first));
+  (window.document.body as unknown as HTMLElement).dispatchEvent(pointerEvent(
+    window,
+    'pointermove',
+    null,
+    { clientX: 40, clientY: 25 },
+  ));
   second.dispatchEvent(new window.FocusEvent('focusin', { bubbles: true }) as unknown as FocusEvent);
   assert.equal(firstRegistration.tooltip.hidden, true);
   assert.equal(secondRegistration.tooltip.hidden, false);
@@ -273,17 +297,18 @@ void test('fixed positioning clamps long content and flips above at viewport edg
 
   owner.dispatchEvent(pointerEvent(window, 'pointerover'));
   assert.equal(registration.tooltip.style.position, 'fixed');
+  assert.equal(registration.tooltip.style.pointerEvents, 'none');
   assert.equal(registration.tooltip.style.maxWidth, '284px');
-  assert.equal(registration.tooltip.style.maxHeight, '168px');
+  assert.equal(registration.tooltip.style.maxHeight, 'none');
   assert.equal(registration.tooltip.style.left, '92px');
   assert.equal(registration.tooltip.style.top, '8px');
-  assert.equal(registration.tooltip.style.overflow, 'auto');
+  assert.equal(registration.tooltip.style.overflow, 'visible');
 
   viewport = { width: 500, height: 600 };
   window.dispatchEvent(new window.Event('resize'));
   assert.equal(registration.tooltip.style.maxWidth, '330px');
   assert.equal(registration.tooltip.style.left, '290px');
-  assert.equal(registration.tooltip.style.top, '204px');
+  assert.equal(registration.tooltip.style.top, '92px');
 
   controller.dispose();
   owner.dispatchEvent(pointerEvent(window, 'pointerover'));

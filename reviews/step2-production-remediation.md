@@ -108,3 +108,19 @@ Automated evidence: `62/62` unit, `29/29` component, full `npm test`, все ш�
 Независимое read-only review незакоммиченного candidate подтвердило `Blocker 0 / High 0 / Medium 0 / Low 0`. Проверены visibility, tooltip/sr-only, отсутствие ожидаемого horizontal overflow, сохранение `--hub-row-x`, focus/forced-colors и согласованность версии `0.2.1`. Full `npm test` после version bump прошёл: unit `62/62`, component `29/29`, bundle scan и Extension Host VS Code `1.105.1` exit `0`; ESLint, TypeScript и `git diff --check` проходят. Остаточные риски относятся к реальному Chromium layout на 260 px/200% zoom, Windows forced colors и пользовательской визуальной проверке установленного пакета.
 
 Package/install evidence для `0.2.1` на момент source review отсутствует и выполняется после отдельного чистого hotfix commit. Evidence `0.2.0` на этот candidate не переносится.
+
+## Tooltip hotfix `0.2.2`
+
+Пользовательская проверка установленного `0.2.1` выявила несоответствие ожидаемому макету: tooltip заголовка истории и каждой строки диалога создавали лишний шум, а popup удерживался при наведении и перекрывал содержимое. Новое УТЗ-09 удаляет эти owners и возвращает геометрическое немедленное скрытие popup, сохраняя keyboard-focus и ARIA оставшихся интерактивных источников.
+
+Production удаляет `tabindex`/tooltip registration заголовка истории и registrations названий диалогов. Tooltip popup получает `pointer-events:none`; capture `pointermove` документа проверяет фактический `getBoundingClientRect`, немедленно скрывает popup внутри и на границе и удерживает dismissal latch до реального завершения взаимодействия с owner. Targeted component regressions проходят `29/29`; полный release gate и независимое review выполняются на candidate `0.2.2`.
+
+Первое независимое source review `0.2.2`: `Blocker 0 / High 1 / Medium 2 / Low 0`. Исправления:
+
+- race реального порядка `pointerout → pointermove → pointerover` закрыт явным сбросом dismissal при первом новом interaction уже неактивного owner и точным regression test этого порядка;
+- непрокручиваемое внутреннее обрезание устранено: popup имеет content height, `max-height:none` и `overflow:visible`; физическая граница Webview остаётся ограничением поверхности, полный текст доступен через ARIA;
+- `design-size-spec.md`, package rows test matrix и manual passport обновлены с устаревших popup/`0.2.0` контрактов на УТЗ-09 и `0.2.2`.
+
+Targeted проверки после исправлений: component `29/29`, TypeScript, ESLint и `git diff --check` — PASS. Требуется повторное независимое review и затем полный release gate.
+
+Повторное review сначала выявило только два нормативных рассогласования geometry/package, после синхронизации канонического ТЗ, размерной спецификации, manual checklist и test matrix финальный результат: `Blocker 0 / High 0 / Medium 0 / Low 0`, verdict `SOURCE REVIEW APPROVED`. Все behavioral findings остаются закрыты; release gate выполняется на одном source commit `0.2.2`.

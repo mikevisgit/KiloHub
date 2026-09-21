@@ -43,7 +43,6 @@ interface ConversationView {
   readonly item: HTMLLIElement;
   readonly visibleTitle: HTMLSpanElement;
   readonly fullTitle: HTMLSpanElement;
-  readonly tooltip: TooltipRegistration;
 }
 
 interface FolderView {
@@ -59,11 +58,9 @@ interface FolderView {
   readonly actions: HTMLDivElement;
   readonly actionButtons: Readonly<Record<FolderAction, HTMLButtonElement>>;
   readonly history: HTMLElement;
-  readonly historyTitle: HTMLHeadingElement;
   readonly conversations: HTMLUListElement;
   readonly pathTooltip: TooltipRegistration;
   readonly actionTooltips: readonly TooltipRegistration[];
-  readonly historyTooltip: TooltipRegistration;
   readonly conversationViews: Map<string, ConversationView>;
   dto: HubFolderDto;
 }
@@ -80,7 +77,6 @@ type RgbaColor = readonly [number, number, number, number];
 
 const INFO_TOOLTIP = 'Здесь собраны папки, в которых вы работали с Kilo. Чтобы вернуться к работе, выберите папку и откройте её.';
 const REFRESH_TOOLTIP = 'Обновить список папок и диалогов из Kilo';
-const HISTORY_TOOLTIP = 'До трёх последних диалогов. Открыть и продолжить их можно в Kilo Code';
 const UNKNOWN_DATE = 'Дата неизвестна';
 const DAY_MILLISECONDS = 86_400_000;
 const RENDER_CHUNK_SIZE = 50;
@@ -565,8 +561,6 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
     const history = createElement(document, 'section', 'history');
     const historyTitle = createElement(document, 'h2', 'history-title');
     historyTitle.textContent = 'Последние диалоги';
-    historyTitle.tabIndex = 0;
-    historyTitle.dataset.key = semanticKey('folder-history', dto.id);
     const conversations = createElement(document, 'ul', 'conversation-list');
     history.append(historyTitle, conversations);
     detail.append(actions, history);
@@ -587,14 +581,12 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
       actions,
       actionButtons,
       history,
-      historyTitle,
       conversations,
       pathTooltip: tooltipController.register(header, dto.path),
       actionTooltips: FOLDER_ACTIONS.map((action) => tooltipController.register(
         actionButtons[action],
         ACTION_COPY[action].tooltip,
       )),
-      historyTooltip: tooltipController.register(historyTitle, HISTORY_TOOLTIP),
       conversationViews: new Map(),
       dto,
     };
@@ -620,18 +612,15 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
             item,
             visibleTitle,
             fullTitle,
-            tooltip: tooltipController.register(visibleTitle, conversation.title, { focusable: false }),
           };
           view.conversationViews.set(key, conversationView);
         }
         conversationView.visibleTitle.textContent = conversation.title;
         conversationView.fullTitle.textContent = conversation.title;
-        conversationView.tooltip.update(conversation.title);
         view.conversations.append(conversationView.item);
       });
     for (const [key, conversationView] of view.conversationViews) {
       if (retained.has(key)) continue;
-      conversationView.tooltip.dispose();
       conversationView.item.remove();
       view.conversationViews.delete(key);
     }
@@ -676,9 +665,7 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
 
   function disposeFolderView(view: FolderView): void {
     view.pathTooltip.dispose();
-    view.historyTooltip.dispose();
     for (const registration of view.actionTooltips) registration.dispose();
-    for (const conversation of view.conversationViews.values()) conversation.tooltip.dispose();
     view.element.remove();
   }
 
