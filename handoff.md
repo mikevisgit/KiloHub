@@ -1,8 +1,8 @@
-# Передача состояния Step 1
+# Передача состояния Kilo Hub
 
 ## Текущее состояние
 
-- Статус: Step 1 реализован, упакован и установлен; подготовлена отдельная задача на визуальную проработку без расширения функционального scope.
+- Статус: Step 2 реализован, reviewed, reproducibly упакован и установлен как `local.kilo-hub@0.2.0`; готов к финальной визуальной проверке пользователем.
 - Ветка: `master`.
 - Исходный коммит: `9642700 Align Step 1 with Kilo SQLite history`.
 - В начале работы рабочее дерево было чистым.
@@ -19,6 +19,8 @@
 - Техническое направление: `req/step1/03-technical-plan.md`.
 - Приёмка: `req/step1/04-preparation-and-acceptance.md`.
 - План выполнения: `specs/step1-implementation-plan.md`.
+- Нормативный Step 2: `req/step2/README.md`, `req/step2/02-уточнение-ТЗ.md` и `req/step2/ТЗ реализации дизайна VSIX.md`.
+- План Step 2: `specs/step2-implementation-plan.md`.
 
 ## Прогресс
 
@@ -270,3 +272,7 @@ Remediation устраняет chunked render/heartbeat, action-time current/rev
 Targeted re-review первого remediation commit подтвердил исправление всех исходных Requirements/Accessibility findings; новый Low `History h3` исправлен. Дополнительный security/testability набор закрыл SQL native-sort/resource budget, filesystem outstanding-probe bound, общую Output sanitization, fail-closed resolved-view/browser-ready gate, current Stable test-host stability, два независимых release cycles, exact Node engine/negative verifier и полную test/manual traceability. Повторный merged gate после этих исправлений: unit 60/60, component 29/29, minimum VS Code `1.105.1` и Current `1.138.0` exit `0`, audit `0 vulnerabilities`. Package Blocker остаётся единственным ожидаемым gate до clean VSIX `0.2.0`.
 
 Второй targeted pass нашёл только остаточные cases внутри тех же findings: timestamp BLOB, late path rejection, warning-channel path, history heading/reference и traceability IDs. Они закрыты отдельными SQL/type/limit guards, bounded semaphore regression, warning sanitizer boundary, синхронизированным `h2` reference и точной evidence-картой. Финальный source gate после исправлений: unit 62/62, component 29/29, full `npm test`, minimum/current Extension Host и шесть design verifiers — PASS. Следующий этап: clean source re-review commit, затем фактический `npm run release` и package review по одному SHA-256.
+
+### Финальный Step 2 release
+
+Source review exit достигнут; package/release review `0/0/0/0`, verdict `PACKAGE/RELEASE APPROVED`. Нормативный `npm run release` выполнил два независимых secure-TLS clean cycles (`npm ci`, audit, clean, full test, package) с одинаковым SHA-256, Current development gate, четыре negative verifier cases и installed minimum/current gates. Exact artifact: `D:\VSCode\KiloHub\dist\kilo-hub-0.2.0-win32-x64.vsix`, `31547` bytes, SHA-256 `69D380ADC18BE9DC4CE25BB8266E19B46078613AB4057A5C5ABA970FDAB607C2`, source commit `48d5884b2e364ccaeecc8e1e3d09baf1711c62a9`. Основной профиль VS Code успешно обновлён до `local.kilo-hub@0.2.0`. Полный evidence: `docs/step2-verification.md`; пользовательская проверка: `docs/step2-user-acceptance.md`. До результата пользователя визуальная/NVDA/manual action приёмка остаётся `Не проверено`, но plugin установлен и готов к финальному пользовательскому тестированию.

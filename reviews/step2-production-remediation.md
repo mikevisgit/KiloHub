@@ -52,6 +52,19 @@ Remediation не завершён, пока:
 4. full review чистого release-candidate commit не даст `Blocker=0`, `High=0`, а все Medium/Low будут закрыты;
 5. exact VSIX hash не пройдёт package/repro/install gate.
 
+## Финальный package/release exit
+
+R-17 закрыт для source commit `48d5884b2e364ccaeecc8e1e3d09baf1711c62a9` и SHA-256 `69D380ADC18BE9DC4CE25BB8266E19B46078613AB4057A5C5ABA970FDAB607C2`:
+
+- два независимых clean/full/package cycles дали одинаковые `31547` bytes;
+- exact verifier проверил 10 entries, identity/version/target/engines/view/commands и hashes четырёх bundles;
+- negative verifier отклонил extra, missing, stale и wrong-engine packages;
+- development и installed Extension Host tests прошли на VS Code `1.105.1` и `1.138.0`;
+- основной профиль содержит `local.kilo-hub@0.2.0`;
+- финальный package review: `Blocker 0 / High 0 / Medium 0 / Low 0`, `PACKAGE/RELEASE APPROVED`.
+
+Все source/package review findings закрыты. Остаётся только пользовательский manual visual/NVDA/actions verdict, который не подменяется автоматическими evidence.
+
 ## Targeted re-review и второй набор исправлений
 
 Targeted re-review commit `c5cd72b` подтвердил закрытие всех исходных Requirements и Accessibility findings, но нашёл один общий Low в документации (`History h3` вместо production `h2`); размерная спецификация исправлена.

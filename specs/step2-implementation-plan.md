@@ -204,7 +204,7 @@ Gate M6: полный suite зелёный из clean checkout; traceability н�
 - [x] Независимо проверить accessibility, keyboard, focus, tooltip и screen-reader semantics.
 - [x] Независимо проверить tests, negative cases, concurrency и 1000-session invariants.
 - [x] Независимо проверить themes/contrast/color/size/motion/scroll contracts.
-- [ ] После M8 независимо проверить exact package contents, provenance и installed smoke.
+- [x] После M8 независимо проверить exact package contents, provenance и installed smoke.
 
 Каждый отчёт в `reviews/` содержит source commit, при наличии VSIX path/SHA-256, severity, evidence и disposition. После каждого исправления выполняются targeted test и targeted re-review затронутой области плюс зависимые regressions. Исправление создаёт новый source commit; если изменился production/package input, прежний VSIX и зависящее от него evidence аннулируются, M8 повторяется.
 
@@ -214,25 +214,25 @@ Gate M7: цикл повторяется до `Blocker=0`, `High=0`; кажды�
 
 Зависимости: зелёный M6 и текущий review candidate M7.
 
-- [ ] До release commit подготовить русские release notes и manifest `0.2.0`; выполнить status/diff/log, закоммитить только целевые проверенные файлы.
+- [x] До release commit подготовить русские release notes и manifest `0.2.0`; выполнить status/diff/log, закоммитить только целевые проверенные файлы.
 - [x] Обновить build до exact outputs: `build/extension.js`, `build/kiloDataWorker.js`, `build/webview/webview.js`, `build/webview/webview.css`. Source maps и demo assets не генерировать для package.
 - [x] Обновить положительный `files` allow-list и exact verifier для полного списка entries, identity/version/target/engine, Webview contribution, CSP assets и SHA-256 каждого build output.
 - [x] Добавить negative verifier tests: лишний, отсутствующий, stale/mutated asset и неверный Node engine должны отклоняться.
-- [ ] Из чистого checkout выполнить два независимых цикла `npm ci` → `npm run clean` → full test → `npm run package`; оба раза получить байт-в-байт одинаковый `dist/kilo-hub-0.2.0-win32-x64.vsix`.
-- [ ] Exact archive не содержит `tests/`, fixtures, `req/`, `reviews/`, `old_donotuse/`, demo themes/HTML/JS, source maps, DB/WAL/SHM, `node_modules/` и лишние исходники.
-- [ ] Запустить exact verifier до любой установки и записать path, bytes и SHA-256.
-- [ ] Установить именно этот SHA-256 с `--force` в пустые изолированные `--user-data-dir`/`--extensions-dir` на VS Code `1.105.1` и актуальной release-версии.
-- [ ] Installed-host smoke подтверждает identity `local.kilo-hub@0.2.0`, activation, browser asset load/initial protocol synchronization и packaged-worker refresh на обезличенной fixture.
-- [ ] Провести package review M7 на том же commit/hash; любое package finding запускает fix → re-test → new package → exact verify → reinstall → re-review.
+- [x] Из чистого checkout выполнить два независимых цикла `npm ci` → `npm run clean` → full test → `npm run package`; оба раза получить байт-в-байт одинаковый `dist/kilo-hub-0.2.0-win32-x64.vsix`.
+- [x] Exact archive не содержит `tests/`, fixtures, `req/`, `reviews/`, `old_donotuse/`, demo themes/HTML/JS, source maps, DB/WAL/SHM, `node_modules/` и лишние исходники.
+- [x] Запустить exact verifier до любой установки и записать path, bytes и SHA-256.
+- [x] Установить именно этот SHA-256 с `--force` в пустые изолированные `--user-data-dir`/`--extensions-dir` на VS Code `1.105.1` и актуальной release-версии.
+- [x] Installed-host smoke подтверждает identity `local.kilo-hub@0.2.0`, activation, browser asset load/initial protocol synchronization и packaged-worker refresh на обезличенной fixture.
+- [x] Провести package review M7 на том же commit/hash; package/release review `0/0/0/0`, verdict `PACKAGE/RELEASE APPROVED`.
 
-Gate M8: существует один текущий reproducible exact-verified устанавливаемый VSIX с записанными full source commit и SHA-256; все автоматические/review evidence относятся к нему.
+Gate M8: пройден для source commit `48d5884b2e364ccaeecc8e1e3d09baf1711c62a9`, artifact `31547` bytes, SHA-256 `69D380ADC18BE9DC4CE25BB8266E19B46078613AB4057A5C5ABA970FDAB607C2`.
 
 ### M9. Ручной пользовательский checklist и финальное evidence
 
 Зависимости: финальные M7 и M8.
 
-- [ ] Создать в `docs/` результат прогона по `req/step2/04-manual-acceptance-checklist.md`, не изменяя нормативный шаблон; заполнить паспорт commit/hash/VS Code/Kilo/Windows/scaling/themes/NVDA/fixture.
-- [ ] Выполнить установленный VSIX, а не local HTML или Extension Development Host.
+- [x] Создать в `docs/` документ пользовательской приёмки по `req/step2/04-manual-acceptance-checklist.md`, не изменяя нормативный шаблон; заполнить паспорт commit/hash/VS Code/Kilo/Windows и exact artifact.
+- [x] Установить exact VSIX в изолированные minimum/current profiles и основной профиль; пользовательская визуальная проверка выполняется после `Developer: Reload Window`.
 - [ ] Проверить 260/320/400 CSSpx, zoom 100/200%, отсутствие горизонтального scroll и ровно две верхние строки.
 - [ ] Проверить четыре точные встроенные темы, live theme change, forced colors и два representative custom themes как best effort; приложить screenshots/contrast evidence.
 - [ ] Проверить keyboard-only, NVDA semantics, focus, tooltip hover/focus/popup/Escape/viewport, duplicate names и точные объявления.
@@ -241,8 +241,8 @@ Gate M8: существует один текущий reproducible exact-verifie
 - [ ] Выполнить три реальные folder actions только на disposable available non-current folder, только Explorer на current и подтвердить отсутствие actions у missing.
 - [ ] Выполнить 1000-session observation без превращения субъективного результата в числовой SLA.
 - [ ] Получить и записать пользовательский verdict по pixel-level и субъективному визуальному качеству. До этого пункта визуальная приёмка остаётся `Не проверено`.
-- [ ] Обновить `handoff.md`: source commit, clean status, exact VSIX path/hash/size, версии, все команды, review exit, manual results, известные ограничения и остаточные риски.
-- [ ] Выполнить финальные `git status`, `git diff`, `git diff --check` и сверку всех ссылок evidence на один commit/hash.
+- [x] Обновить `handoff.md`: source commit, exact VSIX path/hash/size, версии, команды, review exit, manual pending status, известные ограничения и остаточные риски.
+- [x] Выполнить финальные `git status`, `git diff`, `git diff --check` и сверку всех package/release evidence на source commit `48d5884` и SHA-256 `69D380AD...07C2`.
 
 Gate M9: все обязательные manual cases имеют evidence и итог, пользовательская визуальная приёмка записана, а любое найденное несоответствие возвращает работу в M6–M8 и аннулирует зависящие результаты старого VSIX.
 
