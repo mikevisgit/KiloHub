@@ -420,7 +420,7 @@ export async function run(): Promise<void> {
     assert.equal(extension.isActive, false);
     assertManifest(extension.packageJSON);
     const manifest = extension.packageJSON;
-    assert.equal(manifest.version, '0.2.0');
+    assert.equal(manifest.version, '0.2.1');
     assert.deepEqual(sorted(manifest.activationEvents), sorted(['onCommand:kiloHub.refresh', 'onView:kiloHub.folders']));
     assert.deepEqual(sorted(manifest.contributes.commands.map(({ command }) => command)), sorted(COMMAND_IDS));
     assert.equal(manifest.contributes.viewsContainers.activitybar.length, 1);

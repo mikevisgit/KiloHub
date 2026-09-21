@@ -6,8 +6,8 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $sourceManifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'package.json') -Raw | ConvertFrom-Json
-if ($sourceManifest.version -ne '0.2.0') {
-    throw "Step 2 release requires package version 0.2.0, found $($sourceManifest.version)."
+if ($sourceManifest.version -ne '0.2.1') {
+    throw "Step 2 hotfix release requires package version 0.2.1, found $($sourceManifest.version)."
 }
 $artifactName = "$($sourceManifest.name)-$($sourceManifest.version)-win32-x64.vsix"
 $artifactCandidate = if ([string]::IsNullOrWhiteSpace($ArtifactPath)) {

@@ -100,3 +100,11 @@ Automated evidence после второго набора: `60/60` unit, `29/29`
 - traceability manual IDs сверены с реально объявленными checklist IDs, missing security/scope cases добавлены.
 
 Automated evidence: `62/62` unit, `29/29` component, full `npm test`, все шесть design-reference verify, minimum VS Code `1.105.1` и Current `1.138.0` exit `0`. Source review exit повторно проверяется на следующем commit; package Blocker остаётся единственным ожидаемым gate.
+
+## Visual hotfix `0.2.1`
+
+Пользовательская проверка `0.2.0` выявила два blocking visual findings: browser presentation атрибута `hidden` перекрывался author CSS, а стандартный Webview `body` padding складывался с production gutter. В candidate `0.2.1` добавлен безусловный `[hidden]`, внешний padding сброшен, full-width/minmax constraints закреплены для panel/list/card/detail/actions, а рамка перенесена с оболочки `.hub` на `.folder`.
+
+Независимое read-only review незакоммиченного candidate подтвердило `Blocker 0 / High 0 / Medium 0 / Low 0`. Проверены visibility, tooltip/sr-only, отсутствие ожидаемого horizontal overflow, сохранение `--hub-row-x`, focus/forced-colors и согласованность версии `0.2.1`. Full `npm test` после version bump прошёл: unit `62/62`, component `29/29`, bundle scan и Extension Host VS Code `1.105.1` exit `0`; ESLint, TypeScript и `git diff --check` проходят. Остаточные риски относятся к реальному Chromium layout на 260 px/200% zoom, Windows forced colors и пользовательской визуальной проверке установленного пакета.
+
+Package/install evidence для `0.2.1` на момент source review отсутствует и выполняется после отдельного чистого hotfix commit. Evidence `0.2.0` на этот candidate не переносится.

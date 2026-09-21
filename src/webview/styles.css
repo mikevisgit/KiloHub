@@ -11,8 +11,9 @@
   --hub-fg: var(--vscode-sideBar-foreground, var(--vscode-foreground));
   --hub-muted: var(--vscode-descriptionForeground);
   --hub-border: var(--vscode-sideBar-border, transparent);
+  --hub-card-border: color-mix(in srgb, var(--hub-fg) 16%, transparent);
   --hub-focus: var(--vscode-focusBorder);
-  --hub-card: var(--vscode-sideBar-background);
+  --hub-card: color-mix(in srgb, var(--hub-fg) 4%, var(--hub-bg));
   --hub-hover: var(--vscode-list-hoverBackground);
   --hub-hover-fg: var(--vscode-list-hoverForeground, var(--hub-fg));
   --hub-current-bg: var(--vscode-list-inactiveSelectionBackground);
@@ -23,16 +24,22 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html,
 body,
 #app {
   width: 100%;
+  max-width: none;
   height: 100%;
   min-width: 0;
   margin: 0;
 }
 
 body {
+  padding: 0 !important;
   overflow: hidden;
   background: var(--hub-bg);
   color: var(--hub-fg);
@@ -50,12 +57,12 @@ button {
 .hub {
   display: flex;
   width: 100%;
+  max-width: none;
   height: 100%;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
   padding-bottom: var(--hub-gap);
-  border: 1px solid var(--hub-border);
   background: var(--hub-bg);
 }
 
@@ -117,9 +124,12 @@ button {
 
 .folders {
   display: grid;
+  width: 100%;
+  max-width: none;
   min-width: 0;
   min-height: 0;
   flex: 1;
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: var(--hub-gap);
   padding: calc(var(--hub-base) * 0.2307692308) var(--hub-row-x) var(--hub-gap);
@@ -130,9 +140,11 @@ button {
 }
 
 .folder {
+  width: 100%;
+  max-width: none;
   min-width: 0;
   margin: 0;
-  border: 1px solid var(--hub-border);
+  border: 1px solid var(--hub-card-border);
   border-radius: 15px;
   background: var(--hub-card);
 }
@@ -244,17 +256,21 @@ button {
 }
 
 .detail {
+  width: 100%;
   min-width: 0;
   padding: calc(var(--hub-base) * 0.3076923077) var(--hub-row-x) var(--hub-gap);
 }
 
 .actions {
   display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
   gap: calc(var(--hub-base) * 0.3076923077);
 }
 
 .action {
   display: flex;
+  width: 100%;
   min-width: 0;
   min-height: calc(var(--hub-base) * 2.1538461538);
   padding: calc(var(--hub-base) * 0.3076923077) calc(var(--hub-base) * 0.6153846154);

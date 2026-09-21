@@ -39,11 +39,16 @@ void test('production scale variables preserve the B=13/16/20 size contract', as
 
 void test('production CSS keeps 260/320/400 layouts horizontally bounded', async () => {
   const css = await readFile(stylesPath, 'utf8');
-  assert.match(css, /html,\s*body,\s*#app\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/su);
-  assert.match(css, /\.hub\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/su);
-  assert.match(css, /\.folders\s*\{[^}]*min-width:\s*0;[^}]*overflow-x:\s*hidden;/su);
+  assert.match(css, /html,\s*body,\s*#app\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*none;[^}]*min-width:\s*0;/su);
+  assert.match(css, /body\s*\{[^}]*padding:\s*0\s*!important;/su);
+  assert.match(css, /\.hub\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*none;[^}]*min-width:\s*0;/su);
+  assert.match(css, /\.folders\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*none;[^}]*min-width:\s*0;[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);[^}]*overflow-x:\s*hidden;/su);
+  assert.match(css, /\.folder\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*none;[^}]*min-width:\s*0;/su);
   assert.match(css, /\.folder-head\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/su);
   assert.match(css, /\.identity\s*\{[^}]*min-width:\s*0;/su);
+  assert.match(css, /\.detail\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/su);
+  assert.match(css, /\.actions\s*\{[^}]*width:\s*100%;[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/su);
+  assert.match(css, /\.action\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/su);
   assert.match(css, /\.folder-name\s*\{[^}]*overflow-wrap:\s*anywhere;/su);
   assert.match(css, /\.conversation\s*\{[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/su);
   assert.doesNotMatch(css, /@media\s*\([^)]*(?:width|zoom)[^)]*\)[^{]*\{[^}]*font-size/isu);
@@ -61,7 +66,9 @@ void test('production CSS keeps 260/320/400 layouts horizontally bounded', async
 
 void test('focus, forced-colors, reduced-motion and panel edge contracts are present', async () => {
   const css = await readFile(stylesPath, 'utf8');
-  assert.match(css, /\.hub\s*\{[^}]*padding-bottom:\s*var\(--hub-gap\);[^}]*border:\s*1px solid var\(--hub-border\);/su);
+  assert.match(css, /\[hidden\]\s*\{[^}]*display:\s*none\s*!important;/su);
+  assert.doesNotMatch(css, /\.hub\s*\{[^}]*border:/su);
+  assert.match(css, /\.folder\s*\{[^}]*border:\s*1px solid var\(--hub-card-border\);/su);
   assert.doesNotMatch(css, /\.folder\s*\{[^}]*overflow:\s*(?:clip|hidden)/su);
   assert.match(css, /\.folder-head:focus-visible[\s\S]*outline-offset:\s*-3px;/u);
   assert.match(css, /@media\s*\(forced-colors:\s*active\)[\s\S]*CanvasText[\s\S]*Highlight/u);

@@ -2,7 +2,7 @@
 
 ## Текущее состояние
 
-- Статус: Step 2 реализован, reviewed, reproducibly упакован и установлен как `local.kilo-hub@0.2.0`; готов к финальной визуальной проверке пользователем.
+- Статус: пользовательская визуальная приёмка `0.2.0` выявила blocking CSS-дефекты; готовится hotfix `0.2.1`, прежний VSIX не является финальным.
 - Ветка: `master`.
 - Исходный коммит: `9642700 Align Step 1 with Kilo SQLite history`.
 - В начале работы рабочее дерево было чистым.
@@ -276,3 +276,9 @@ Targeted re-review первого remediation commit подтвердил исп
 ### Финальный Step 2 release
 
 Source review exit достигнут; package/release review `0/0/0/0`, verdict `PACKAGE/RELEASE APPROVED`. Нормативный `npm run release` выполнил два независимых secure-TLS clean cycles (`npm ci`, audit, clean, full test, package) с одинаковым SHA-256, Current development gate, четыре negative verifier cases и installed minimum/current gates. Exact artifact: `D:\VSCode\KiloHub\dist\kilo-hub-0.2.0-win32-x64.vsix`, `31547` bytes, SHA-256 `69D380ADC18BE9DC4CE25BB8266E19B46078613AB4057A5C5ABA970FDAB607C2`, source commit `48d5884b2e364ccaeecc8e1e3d09baf1711c62a9`. Основной профиль VS Code успешно обновлён до `local.kilo-hub@0.2.0`. Полный evidence: `docs/step2-verification.md`; пользовательская проверка: `docs/step2-user-acceptance.md`. До результата пользователя визуальная/NVDA/manual action приёмка остаётся `Не проверено`, но plugin установлен и готов к финальному пользовательскому тестированию.
+
+### Визуальный hotfix `0.2.1`
+
+Пользовательская проверка установленного `0.2.0` выявила два blocking-дефекта: у всех карточек отображались взаимоисключающие подписи `Вы сейчас здесь` и `Папка не найдена`, а суммарные горизонтальные поля Webview и production layout чрезмерно сужали карточки. Причина первого дефекта — author rules с `display: block`, которые перекрывали browser presentation атрибута `hidden`; причина второго — стандартный `body` padding Webview поверх внутреннего `--hub-row-x`.
+
+В рабочем дереве добавлен `[hidden] { display: none !important; }`, внешний `body` padding сброшен в `0`, full-width/minmax constraints заданы для panel/list/card/detail/actions, а внутренний gutter `--hub-row-x` сохранён. Рамка относится к каждой `.folder`, а не ко всей `.hub`. Версия и release metadata обновлены до `0.2.1`. Full `npm test` после version bump прошёл: unit `62/62`, component `29/29`, bundle scan и Extension Host VS Code `1.105.1` exit `0`; ESLint, TypeScript и `git diff --check` проходят. Независимое source review: `Blocker 0 / High 0 / Medium 0 / Low 0`. Воспроизводимая упаковка, VSIX `0.2.1`, установка и повторный visual verdict выполняются после отдельного чистого hotfix commit; `0.2.0` остаётся только историческим evidence.
