@@ -5,11 +5,16 @@ $manifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'package.json') 
 $artifact = (Resolve-Path -LiteralPath (Join-Path $repositoryRoot "dist\$($manifest.name)-$($manifest.version)-win32-x64.vsix")).Path
 $testRoot = Join-Path $repositoryRoot 'build\vsix-verifier-negative'
 New-Item -ItemType Directory -Force -Path $testRoot | Out-Null
+Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 function Assert-VerificationFails([string]$Candidate, [string]$Label) {
+    $previousErrorPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'verify-vsix.ps1') -ArtifactPath $Candidate *> $null
-    if ($LASTEXITCODE -eq 0) {
+    $exitCode = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorPreference
+    if ($exitCode -eq 0) {
         throw "VSIX verifier accepted invalid case: $Label"
     }
     "PASS rejected: $Label"
