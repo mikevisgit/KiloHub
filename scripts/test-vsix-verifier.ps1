@@ -63,3 +63,34 @@ try {
     try { $writer.Write(($packagedManifest | ConvertTo-Json -Depth 100 -Compress)) } finally { $writer.Dispose() }
 } finally { $archive.Dispose() }
 Assert-VerificationFails $engine 'wrong Node engine'
+
+$missingReadme = Copy-Candidate 'missing-readme.vsix'
+$archive = [System.IO.Compression.ZipFile]::Open($missingReadme, [System.IO.Compression.ZipArchiveMode]::Update)
+try { $archive.GetEntry('extension/readme.md').Delete() } finally { $archive.Dispose() }
+Assert-VerificationFails $missingReadme 'missing Details README'
+
+$staleReadme = Copy-Candidate 'stale-readme.vsix'
+$archive = [System.IO.Compression.ZipFile]::Open($staleReadme, [System.IO.Compression.ZipArchiveMode]::Update)
+try {
+    $archive.GetEntry('extension/readme.md').Delete()
+    $entry = $archive.CreateEntry('extension/readme.md')
+    $writer = [System.IO.StreamWriter]::new($entry.Open())
+    try { $writer.Write('outdated description') } finally { $writer.Dispose() }
+} finally { $archive.Dispose() }
+Assert-VerificationFails $staleReadme 'stale Details README'
+
+$wrongDetails = Copy-Candidate 'wrong-details-asset.vsix'
+$archive = [System.IO.Compression.ZipFile]::Open($wrongDetails, [System.IO.Compression.ZipArchiveMode]::Update)
+try {
+    $entry = $archive.GetEntry('extension.vsixmanifest')
+    $reader = [System.IO.StreamReader]::new($entry.Open())
+    try { [xml]$xml = $reader.ReadToEnd() } finally { $reader.Dispose() }
+    $asset = $xml.SelectSingleNode("//*[local-name()='Asset' and @Type='Microsoft.VisualStudio.Services.Content.Details']")
+    if ($null -eq $asset) { throw 'Valid archive must contain a Details asset.' }
+    $asset.SetAttribute('Path', 'extension/docs/release-notes.md')
+    $entry.Delete()
+    $replacement = $archive.CreateEntry('extension.vsixmanifest')
+    $writer = [System.IO.StreamWriter]::new($replacement.Open())
+    try { $writer.Write($xml.OuterXml) } finally { $writer.Dispose() }
+} finally { $archive.Dispose() }
+Assert-VerificationFails $wrongDetails 'wrong Details asset path'

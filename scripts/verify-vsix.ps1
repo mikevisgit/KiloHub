@@ -31,6 +31,7 @@ try {
         'extension/build/webview/webview.js',
         'extension/docs/release-notes.md',
         'extension/package.json',
+        'extension/readme.md',
         'extension/resources/hub.svg',
         'extension/resources/kilo-hub.png'
     ) | Sort-Object
@@ -122,6 +123,22 @@ try {
     }
     if ($deploymentManifest -notmatch 'TargetPlatform="win32-x64"') {
         throw 'VSIX target platform is not win32-x64.'
+    }
+    [xml]$deploymentXml = $deploymentManifest
+    $details = @($deploymentXml.SelectNodes("//*[local-name()='Asset' and @Type='Microsoft.VisualStudio.Services.Content.Details']"))
+    if ($details.Count -ne 1 -or $details[0].GetAttribute('Path') -ne 'extension/readme.md') {
+        throw 'VSIX does not map Details to the packaged README.'
+    }
+    $readmeStream = $archive.GetEntry('extension/readme.md').Open()
+    $readmeHasher = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $readmeHash = ([BitConverter]::ToString($readmeHasher.ComputeHash($readmeStream))).Replace('-', '')
+    } finally {
+        $readmeStream.Dispose()
+        $readmeHasher.Dispose()
+    }
+    if ($readmeHash -ne (Get-FileHash -LiteralPath (Join-Path $repositoryRoot 'docs/extension-description.md') -Algorithm SHA256).Hash) {
+        throw 'Packaged Details README does not match the canonical description.'
     }
 
     foreach ($bundleName in @('extension.js', 'kiloDataWorker.js', 'webview/webview.js', 'webview/webview.css')) {

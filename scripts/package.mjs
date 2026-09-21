@@ -36,6 +36,8 @@ const result = spawnSync(
     'win32-x64',
     '--no-dependencies',
     '--allow-missing-repository',
+    '--readme-path',
+    'docs/extension-description.md',
     '--out',
     artifact,
   ],
