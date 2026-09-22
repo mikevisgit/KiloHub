@@ -515,6 +515,24 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
   let queryGeneration = 0;
   let composing = false;
   let focusIntent = 0;
+  let searchTimer: number | null = null;
+  let submittedQuery: string | null = null;
+  let deferredState: HostToBrowserMessage | null = null;
+  const waitingRenders: (() => void)[] = [];
+
+  function cancelSearchTimer(): void {
+    if (searchTimer !== null) environment.clearTimeout(searchTimer);
+    searchTimer = null;
+    for (const resume of waitingRenders.splice(0)) resume();
+  }
+
+  function restoreDeferredState(): void {
+    const state = deferredState;
+    deferredState = null;
+    if (state !== null && !disposed && applyState(state, lastAppliedRevision === null ? restoredScrollTop : undefined)) {
+      restoredScrollTop = undefined;
+    }
+  }
 
   function showQueryError(reason: 'short-token' | 'too-long' | null): void {
     searchError.textContent = reason === 'short-token' ? WEBVIEW_STATE_MESSAGES.shortQuery
@@ -523,12 +541,25 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
     searchInput.setAttribute('aria-invalid', String(reason !== null));
   }
 
-  function applySearch(reset = false): void {
+  function applySearch(reset = false, automatic = false): void {
+    cancelSearchTimer();
+    if (disposed) return;
+    if (reset) composing = false;
     const raw = reset ? '' : searchInput.value;
     const parsed = parseSearchQuery(raw);
-    if (parsed.kind === 'invalid') { showQueryError(parsed.reason); return; }
+    if (parsed.kind === 'invalid') {
+      restoreDeferredState();
+      if (!automatic) showQueryError(parsed.reason);
+      return;
+    }
     if (parsed.kind === 'reset') searchInput.value = '';
     showQueryError(null);
+    if (automatic && parsed.normalized === submittedQuery) {
+      restoreDeferredState();
+      return;
+    }
+    submittedQuery = parsed.normalized;
+    deferredState = null;
     queryGeneration += 1;
     renderGeneration += 1;
     vscode.postMessage({ type: 'applySearch', version: PROTOCOL_VERSION, query: raw, generation: queryGeneration });
@@ -797,8 +828,11 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
     searchInput.focus({ preventScroll: true });
   }
 
-  function yieldRender(): Promise<void> {
-    return new Promise((resolve) => environment.setTimeout(resolve, 0));
+  async function yieldRender(): Promise<void> {
+    await new Promise<void>((resolve) => environment.setTimeout(resolve, 0));
+    while (!disposed && (searchTimer !== null || composing)) {
+      await new Promise<void>((resolve) => waitingRenders.push(resolve));
+    }
   }
 
   function renderIsCurrent(generation: number): boolean {
@@ -874,6 +908,10 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
   function applyState(value: unknown, restoredScrollTop?: number): boolean {
     if (!shouldApplyHostMessage(value, lastAppliedRevision)) return false;
     if (value.search && value.search.generation < queryGeneration) return false;
+    if (searchTimer !== null || composing) {
+      if (deferredState === null || value.revision > deferredState.revision) deferredState = value;
+      return false;
+    }
     hostState = value;
     lastAppliedRevision = value.revision;
     const generation = ++renderGeneration;
@@ -938,9 +976,23 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
       event.preventDefault(); applySearch();
     }
   };
-  const onSearchInput = (): void => showQueryError(null);
-  const onCompositionStart = (): void => { composing = true; };
-  const onCompositionEnd = (): void => { composing = false; };
+  const onSearchInput = (): void => {
+    cancelSearchTimer();
+    showQueryError(null);
+    if (composing || disposed) return;
+    const parsed = parseSearchQuery(searchInput.value);
+    if (parsed.kind === 'reset') { applySearch(true, true); return; }
+    if (parsed.kind === 'invalid' || parsed.normalized === submittedQuery) {
+      restoreDeferredState();
+      return;
+    }
+    searchTimer = environment.setTimeout(() => {
+      searchTimer = null;
+      if (!composing && !disposed) applySearch(false, true);
+    }, 300);
+  };
+  const onCompositionStart = (): void => { cancelSearchTimer(); composing = true; };
+  const onCompositionEnd = (): void => { composing = false; onSearchInput(); };
   const onFocus = (): void => {
     updateDates();
     updateTheme();
@@ -990,6 +1042,8 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
     dispose: (): void => {
       if (disposed) return;
       disposed = true;
+      cancelSearchTimer();
+      deferredState = null;
       renderGeneration += 1;
       if (midnightTimer !== null) environment.clearTimeout(midnightTimer);
       themeObserver.disconnect();

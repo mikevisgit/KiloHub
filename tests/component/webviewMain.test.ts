@@ -117,6 +117,146 @@ function folderElement(document: Document, id: string): HTMLElement {
   return match;
 }
 
+function searchClock(window: HappyWindow) {
+  const timers = window as unknown as Pick<Window, 'setTimeout' | 'clearTimeout'>;
+  const set = timers.setTimeout.bind(window), clear = timers.clearTimeout.bind(window);
+  const jobs = new Map<number, { at: number; run: () => void }>();
+  let time = 0, id = 1_000_000;
+  timers.setTimeout = (handler: TimerHandler, delay?: number, ...args: unknown[]) => {
+    if (delay !== 300) return set(handler, delay, ...args);
+    assert.equal(typeof handler, 'function');
+    const key = ++id;
+    jobs.set(key, { at: time + delay, run: () => (handler as (...values: unknown[]) => void)(...args) });
+    return key;
+  };
+  timers.clearTimeout = (key) => { if (key === undefined || !jobs.delete(key)) clear(key); };
+  return { get pending() { return jobs.size; }, tick(ms: number) {
+    time += ms;
+    for (const [key, job] of [...jobs]) if (job.at <= time) { jobs.delete(key); job.run(); }
+  } };
+}
+
+void test('live search debounces typing, Enter flushes once, and clears/short input/disposal cancel timers', async () => {
+  let clock!: ReturnType<typeof searchClock>;
+  const h = await setup({ beforeStart: (window) => { clock = searchClock(window); } });
+  try {
+    h.send(ready(1, [folder()]));
+    const input = h.document.querySelector<HTMLInputElement>('.search-input'); assert.ok(input);
+    const type = (value: string) => { input.value = value; input.dispatchEvent(new h.window.Event('input') as unknown as Event); };
+    const messages = () => h.api.messages.filter((m) => m.type === 'applySearch');
+    type('alp'); clock.tick(200); type('alpha'); clock.tick(299);
+    assert.equal(messages().length, 0); assert.equal(clock.pending, 1);
+    clock.tick(1); assert.equal(messages().length, 1);
+    assert.equal(messages().at(-1)?.query, 'alpha');
+    type(' ALPHA '); clock.tick(300); assert.equal(messages().length, 1);
+    type('beta');
+    input.dispatchEvent(new h.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }) as unknown as Event);
+    assert.equal(messages().length, 2); clock.tick(1000); assert.equal(messages().length, 2);
+    type('pending'); type('ab'); clock.tick(1000); assert.equal(messages().length, 2);
+    assert.equal(h.document.querySelector<HTMLElement>('.search-error')?.hidden, true);
+    type('pending'); type(''); assert.equal(messages().at(-1)?.query, '');
+    const cleared = messages().length; clock.tick(1000); assert.equal(messages().length, cleared);
+    type('pending'); (h.document.querySelector('.search-clear') as HTMLButtonElement).click();
+    assert.equal(clock.pending, 0); const clicked = messages().length;
+    clock.tick(1000); assert.equal(messages().length, clicked);
+    type('pending');
+    input.dispatchEvent(new h.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }) as unknown as Event);
+    assert.equal(clock.pending, 0);
+    type('pending'); const beforeDispose = messages().length; h.app.dispose();
+    clock.tick(1000); assert.equal(messages().length, beforeDispose);
+  } finally { h.dispose(); }
+});
+
+void test('live search suspends IME and rejects old responses while a new valid draft is pending', async () => {
+  let clock!: ReturnType<typeof searchClock>;
+  const h = await setup({ beforeStart: (window) => { clock = searchClock(window); } });
+  try {
+    const first = folder(), other = folder({ id: 'other', name: 'Other' });
+    h.send({ ...ready(1, [first]), search: { generation: 0, appliedQuery: '', error: null } });
+    const input = h.document.querySelector<HTMLInputElement>('.search-input'); assert.ok(input);
+    const type = (value: string) => { input.value = value; input.dispatchEvent(new h.window.Event('input') as unknown as Event); };
+    type('alpha'); clock.tick(300);
+    type('beta');
+    h.send({ ...ready(2, [other]), search: { generation: 1, appliedQuery: 'alpha', error: null } });
+    assert.ok(h.document.querySelector(`[data-folder-id="${first.id.replaceAll('\\', '\\\\')}"]`));
+    assert.equal(h.document.querySelector('[data-folder-id="other"]'), null);
+    clock.tick(300);
+    h.send({ ...ready(3, [other]), search: { generation: 1, appliedQuery: 'alpha', error: null } });
+    assert.equal(h.document.querySelector('[data-folder-id="other"]'), null);
+    h.send({ ...ready(4, [other]), search: { generation: 2, appliedQuery: 'beta', error: null } });
+    assert.ok(h.document.querySelector('[data-folder-id="other"]'));
+    type('gamma');
+    input.dispatchEvent(new h.window.CompositionEvent('compositionstart') as unknown as Event);
+    clock.tick(1000); type('дельта'); clock.tick(1000);
+    assert.equal(h.api.messages.filter((m) => m.type === 'applySearch').length, 2);
+    input.dispatchEvent(new h.window.CompositionEvent('compositionend') as unknown as Event);
+    type('дельта'); clock.tick(299);
+    assert.equal(h.api.messages.filter((m) => m.type === 'applySearch').length, 2);
+    clock.tick(1); assert.equal(h.api.messages.at(-1)?.type, 'applySearch');
+    assert.equal(h.api.messages.filter((m) => m.type === 'applySearch').length, 3);
+  } finally { h.dispose(); }
+});
+
+void test('abandoned live draft restores the latest deferred snapshot without searching short text', async () => {
+  let clock!: ReturnType<typeof searchClock>;
+  const h = await setup({ beforeStart: (window) => { clock = searchClock(window); } });
+  try {
+    const input = h.document.querySelector<HTMLInputElement>('.search-input'); assert.ok(input);
+    input.value = 'alpha'; input.dispatchEvent(new h.window.Event('input') as unknown as Event);
+    h.send(ready(3, [folder({ name: 'Newer' })])); h.send(ready(2, [folder({ name: 'Older' })]));
+    input.value = 'ab'; input.dispatchEvent(new h.window.Event('input') as unknown as Event);
+    clock.tick(1000);
+    assert.equal(h.document.querySelector('.folder-name')?.textContent, 'Newer');
+    assert.equal(h.api.messages.filter((m) => m.type === 'applySearch').length, 0);
+  } finally { h.dispose(); }
+});
+
+void test('an in-progress chunk render waits for debounce or IME and resumes only if still current', async () => {
+  for (const mode of ['invalid', 'submit', 'ime', 'dispose']) {
+    let clock!: ReturnType<typeof searchClock>;
+    const h = await setup({ beforeStart: (window) => { clock = searchClock(window); } });
+    const timers = h.window as unknown as Pick<Window, 'setTimeout'>;
+    const original = timers.setTimeout.bind(h.window);
+    const held: (() => void)[] = [];
+    try {
+      h.send(ready(1, [folder()]));
+      const input = h.document.querySelector<HTMLInputElement>('.search-input'); assert.ok(input);
+      const type = (value: string) => { input.value = value; input.dispatchEvent(new h.window.Event('input') as unknown as Event); };
+      timers.setTimeout = (handler: TimerHandler, delay?: number, ...args: unknown[]) => {
+        if (delay !== 0) return original(handler, delay, ...args);
+        held.push(() => (handler as (...values: unknown[]) => void)(...args));
+        return 2_000_000 + held.length;
+      };
+      const many = Array.from({ length: 300 }, (_, i) => folder({ id: `old-${i}`, name: `Old ${i}` }));
+      h.send({ ...ready(2, many), search: { generation: 0, appliedQuery: '', error: null } });
+      assert.equal(held.length, 1);
+      if (mode === 'ime') input.dispatchEvent(new h.window.CompositionEvent('compositionstart') as unknown as Event);
+      else type('new query');
+      held.shift()?.(); await Promise.resolve(); await Promise.resolve();
+      assert.equal(h.document.querySelectorAll('.folder').length, 1, 'old chunk must not paint during input');
+      timers.setTimeout = original;
+      if (mode === 'dispose') {
+        h.app.dispose(); clock.tick(1000);
+        await Promise.resolve(); await Promise.resolve();
+        assert.equal(h.document.querySelectorAll('.folder').length, 0);
+        assert.equal(h.api.messages.filter((m) => m.type === 'applySearch').length, 0);
+      } else if (mode === 'submit') {
+        clock.tick(300);
+        h.send({ ...ready(3, [folder({ name: 'Current' })]), search: { generation: 1, appliedQuery: 'new query', error: null } });
+        await Promise.resolve(); await Promise.resolve();
+        assert.equal(h.document.querySelectorAll('.folder').length, 1);
+        assert.equal(h.document.querySelector('.folder-name')?.textContent, 'Current');
+      } else {
+        input.value = 'ab';
+        if (mode === 'ime') input.dispatchEvent(new h.window.CompositionEvent('compositionend') as unknown as Event);
+        else type('ab');
+        await waitFor(h.window, () => h.document.querySelectorAll('.folder').length === 300);
+        assert.equal(h.api.messages.filter((m) => m.type === 'applySearch').length, 0);
+      }
+    } finally { timers.setTimeout = original; h.dispose(); }
+  }
+});
+
 function buttonActions(element: HTMLElement): string[] {
   return Array.from(element.querySelectorAll<HTMLButtonElement>('.action'))
     .map((button) => button.dataset.action ?? '');

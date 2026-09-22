@@ -287,6 +287,10 @@ Source commit `01d0d63eaa3614c5400c7b8c8a57a4c0ff01248f` прошёл два и�
 
 ### Step 3: нормативный пакет
 
+Source0.3.2:39component/lint PASS; независимое review P2 chunked-render race исправлено и перепроверено, включая dispose. Версия/manifest/lock/verifier обновлены, backend/схема/импорт не менялись. Следует commit и проверенная упаковка/установка, без переноса release evidence0.3.1 на новый пакет.
+
+Готовится0.3.2 по согласованию пользователя: auto-search через300ms, Enter немедленно, пустое поле/крестик/Escape сбрасывают без ожидания. Повторный input отменяет таймер, IME/dispose безопасны, один отложенный metadata snapshot предотвращает показ устаревшей выдачи во время ожидания.38component cases PASS; source review/release/install pending. Изменений базы/индексации нет, основная установленная версия пока0.3.1.
+
 **0.3.1 установлен по просьбе пользователя.** Минимум3символа во всём запросе, короткие слова сохраняются; без schema migration/reimport. Source `39caca5b68801db379b436885df8f4e19c9f0331`, `D:\VSCode\KiloHub\dist\kilo-hub-0.3.1-win32-x64.vsix`,55004bytes,SHA-256 `EB87BB225F32E9F85C118AB729B03B152DC4602DA08A11D50C6B2AFF346CC5A7`. Полный npm run release exit0: два одинаковых clean/full/package цикла112unit/35component/audit0,7negative, dev/installed min/current PASS; PACKAGE APPROVED0/0/0/0. Предыдущий EBUSY тестовой очистки устранён parent-owned fixture lifecycle без production-изменений. Основной VS Code CLI подтвердил local.kilo-hub@0.3.1. Открытое окно может требовать Reload Window; пользовательский visual verdict не заявляется. Подробности docs/step3-verification.md.
 
 Исправление поиска подготовлено как0.3.1:28 targeted cases PASS, search10/10 на обоих bundled runtime, независимое review без findings. Новая база/переиндексация не требуются. Пользователь явно попросил установить новый пакет после удаления старого. Source/package/install gate выполняется отдельно; до его результата установка0.3.1 не объявляется готовой.

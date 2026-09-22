@@ -575,7 +575,7 @@ export async function run(): Promise<void> {
     assert.ok(extension);
     assertManifest(extension.packageJSON);
     const manifest = extension.packageJSON;
-    assert.equal(manifest.version, '0.3.1');
+    assert.equal(manifest.version, '0.3.2');
     assert.equal(manifest.icon, 'resources/kilo-hub.png');
     assert.deepEqual(sorted(manifest.activationEvents), sorted(['onStartupFinished', 'onCommand:kiloHub.refresh', 'onView:kiloHub.folders']));
     assert.deepEqual(sorted(manifest.contributes.commands.map(({ command }) => command)), sorted(COMMAND_IDS));
