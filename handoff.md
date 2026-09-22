@@ -287,6 +287,8 @@ Source commit `01d0d63eaa3614c5400c7b8c8a57a4c0ff01248f` прошёл два и�
 
 ### Step 3: нормативный пакет
 
+**0.3.2 установлен:** auto-search300ms, Enter/очистка немедленно, IME и защита от старой/недорисованной выдачи. Source `ce9fba0906e49f756b17b53bf01b1f94273d0ff8`, `D:\VSCode\KiloHub\dist\kilo-hub-0.3.2-win32-x64.vsix`,55469bytes,SHA-256 `36227DB87DCC66B4E504E401E55852FF412883126CD2BA94B2CA546A08D29E67`. npm run release exit0: два112unit/39component цикла, audit0,7negative,dev/installed min/current PASS. Package review PASS. Основная установка --force успешна, CLI local.kilo-hub@0.3.2. Данные/схема не менялись; пользовательская приёмка после reload отдельно.
+
 Source0.3.2:39component/lint PASS; независимое review P2 chunked-render race исправлено и перепроверено, включая dispose. Версия/manifest/lock/verifier обновлены, backend/схема/импорт не менялись. Следует commit и проверенная упаковка/установка, без переноса release evidence0.3.1 на новый пакет.
 
 Готовится0.3.2 по согласованию пользователя: auto-search через300ms, Enter немедленно, пустое поле/крестик/Escape сбрасывают без ожидания. Повторный input отменяет таймер, IME/dispose безопасны, один отложенный metadata snapshot предотвращает показ устаревшей выдачи во время ожидания.38component cases PASS; source review/release/install pending. Изменений базы/индексации нет, основная установленная версия пока0.3.1.

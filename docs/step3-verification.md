@@ -1,5 +1,11 @@
 # Выпуск Step 3
 
+## Auto-search0.3.2
+
+Source `ce9fba0906e49f756b17b53bf01b1f94273d0ff8`. Артефакт `D:\VSCode\KiloHub\dist\kilo-hub-0.3.2-win32-x64.vsix`,55469bytes,SHA-256 `36227DB87DCC66B4E504E401E55852FF412883126CD2BA94B2CA546A08D29E67`. Полный `npm run release` exit0 в clean detached checkout: два одинаковых clean/full/package цикла112unit/39component, audit0,7negative, dev/installed1.105.1/1.138.0 с controlled PATH. Package review PASS:13entries,5bundles,README/icons/source сверены. Основной VS Code подтвердил установленный local.kilo-hub@0.3.2.
+
+Поиск применяет валидный запрос после300ms, Enter немедленно, очистка/IME/dispose и отложенный chunk-render проверены. Схема/импорт не менялись. Пользовательский visual verdict и применение через Reload Window в ранее открытом окне не объявляются выполненными автоматически.
+
 ## Исправление0.3.1
 
 Установлен `local.kilo-hub@0.3.1`. Source `39caca5b68801db379b436885df8f4e19c9f0331`; файл `D:\VSCode\KiloHub\dist\kilo-hub-0.3.1-win32-x64.vsix`,55004bytes,SHA-256 `EB87BB225F32E9F85C118AB729B03B152DC4602DA08A11D50C6B2AFF346CC5A7`.
