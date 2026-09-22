@@ -2,8 +2,14 @@
 
 ## Текущее состояние
 
-- Статус: пользовательская визуальная приёмка `0.2.0` выявила blocking CSS-дефекты; готовится hotfix `0.2.1`, прежний VSIX не является финальным.
+- Статус: Windows 0.3.2 выпущен локально; исходники опубликованы в `https://github.com/mikevisgit/KiloHub`, GitHub Release готовится. Исторические записи ниже не заменяют актуальное evidence в `docs/step3-verification.md`. Ручная визуальная/NVDA-приёмка остаётся открытой.
 - Ветка: `master`.
+- Материалы macOS выделены в ветку `step4`, коммит `bdc6c96`; в основной ветке production macOS и документы Step 4 не добавлены.
+- По решению пользователя три устаревших файла `req/step2/screenshots/image.png`, `image2.png`, `kilo-hub-step1-scale-reference.png` удалены из актуального дерева в `ad87ab2`. Пользователь проверил изображения и явно разрешил их сохранение в публичной Git-истории. Исторические ссылки на них относятся к старым коммитам.
+- Публикуемый VSIX: `D:\VSCode\KiloHub\dist\kilo-hub-0.3.2-win32-x64.vsix`, 55469 bytes, SHA-256 `36227DB87DCC66B4E504E401E55852FF412883126CD2BA94B2CA546A08D29E67`; checksum повторно совпал. Production source: `ce9fba0906e49f756b17b53bf01b1f94273d0ff8`, код/scripts/отслеживаемые тесты/manifest/lock неизменны относительно него. Документационные коммиты не являются новым source выпуска.
+- Первый повторный `npm test` перед GitHub-публикацией: typecheck/lint PASS, unit-прогон остановлен внешним timeout 600000 ms во время масштабного suite. Полный PASS этой попытки не заявляется; повторная проверка выполняется отдельно. Предыдущий полный release gate 0.3.2 сохранён в `docs/step3-verification.md`.
+- Локальные неотслеживаемые `tests/discovery/step3-production-scale-worker.cjs` и `tests/discovery/step3-production-scale.mjs` сохранены и не включаются в публичные ветки этой операцией.
+- Публикация веток: `git push --atomic -u origin master step4` завершился успешно с credential helper GitHub CLI только для этой команды. GitHub API подтвердил `master` на `ad87ab2`, `step4` на `bdc6c96` и оба документа `req/step4/` в удалённой ветке. Ветка по умолчанию: `master`. Аудит: `reviews/github-publication-audit.md`; секреты по проверенным сигнатурам не обнаружены, ограничения сканирования и разрешение пользователя записаны.
 - Исходный коммит: `9642700 Align Step 1 with Kilo SQLite history`.
 - В начале работы рабочее дерево было чистым.
 - Локальная версия Node.js: `v24.13.0`.
