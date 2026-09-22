@@ -160,7 +160,7 @@ void test('search separates draft and applied, validates NFC/code points, handle
     key('Enter');
     assert.deepEqual(harness.api.messages.at(-1), { type: 'applySearch', version: PROTOCOL_VERSION, query: 'alpha', generation: 1 });
     harness.send({ ...ready(2, [folder()]), search: { generation: 1, appliedQuery: 'alpha', error: null } });
-    for (const value of ['ab', 'alpha по', 'e\u0301x', '😀a']) {
+    for (const value of ['ab', 'e\u0301x', '😀a']) {
       input.value = value; key('Enter');
       assert.equal(harness.api.messages.length, 2);
       assert.equal(harness.document.querySelector('.search-error')?.textContent, WEBVIEW_STATE_MESSAGES.shortQuery);
@@ -186,6 +186,30 @@ void test('search separates draft and applied, validates NFC/code points, handle
     assert.equal(harness.document.querySelectorAll('[title]').length, 0);
     (harness.document.querySelector('.plus') as HTMLButtonElement).click();
     assert.deepEqual(harness.api.messages.at(-1), { type: 'pickFolder', version: PROTOCOL_VERSION });
+  } finally { harness.dispose(); }
+});
+
+void test('search accepts short words and warns only for a short whole query submitted with Enter', async () => {
+  const harness = await setup();
+  try {
+    harness.send(ready(1, [folder()]));
+    const input = harness.document.querySelector<HTMLInputElement>('.search-input');
+    assert.ok(input);
+    const submit = () => input.dispatchEvent(new harness.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }) as unknown as Event);
+    input.value = 'са';
+    input.dispatchEvent(new harness.window.Event('input') as unknown as Event);
+    assert.equal(harness.document.querySelector<HTMLElement>('.search-error')?.hidden, true);
+    submit();
+    assert.equal(harness.document.querySelector('.search-error')?.textContent, 'Введите не менее 3 символов');
+    assert.equal(harness.api.messages.filter((message) => message.type === 'applySearch').length, 0);
+    for (const [index, query] of ['сайт на React', 'бот в тг', 'UI UX', 'a a'].entries()) {
+      input.value = query;
+      submit();
+      assert.deepEqual(harness.api.messages.at(-1), {
+        type: 'applySearch', version: PROTOCOL_VERSION, query, generation: index + 1,
+      });
+      assert.equal(harness.document.querySelector<HTMLElement>('.search-error')?.hidden, true);
+    }
   } finally { harness.dispose(); }
 });
 

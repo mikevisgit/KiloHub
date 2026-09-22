@@ -50,11 +50,51 @@ async function complete(engine: HubIndexEngine, force = false): Promise<HubIndex
 
 void test('shared parsing uses NFC/codepoints, literal punctuation, dedupe, and bounded raw input', () => {
   assert.equal(normalizeSearchText('\u0401 e\u0301'), '\u0435 \u00e9');
-  for (const raw of ['ab', '\ud83d\ude00\ud83d\ude00', 'e\u0301xy ab', 'one x']) assert.deepEqual(parseSearchQuery(raw), { kind: 'invalid', reason: 'short-token' });
+  for (const raw of ['ab', '  a  ', '\ud83d\ude00\ud83d\ude00', 'e\u0301x']) assert.deepEqual(parseSearchQuery(raw), { kind: 'invalid', reason: 'short-token' });
   assert.deepEqual(parseSearchQuery(' \t\n '), { kind: 'reset', normalized: '', tokens: [] });
-  assert.deepEqual(parseSearchQuery(' ALPHA\nalpha\tbeta '), { kind: 'query', normalized: 'alpha beta', tokens: ['alpha', 'beta'] });
+  assert.deepEqual(parseSearchQuery(' ALPHA\nalpha\tbeta '), { kind: 'query', normalized: 'alpha alpha beta', tokens: ['alpha', 'beta'] });
+  for (const raw of ['сайт на React', 'бот в тг', 'UI UX', 'one x', 'e\u0301xy ab', 'a a', 'a b']) {
+    const parsed = parseSearchQuery(raw);
+    assert.equal(parsed.kind, 'query');
+    if (parsed.kind === 'query') assert.deepEqual(parseSearchQuery(parsed.normalized), parsed, 'host/worker revalidation is stable');
+  }
   for (const raw of ['\ud83d\ude00\ud83d\ude00\ud83d\ude00', 'e\u0301xy', '"%_', '*_*', 'a\0b']) assert.equal(parseSearchQuery(raw).kind, 'query');
   assert.deepEqual(parseSearchQuery(' '.repeat(4097)), { kind: 'invalid', reason: 'too-long' });
+});
+
+void test('short words participate in AND and ranking, including short-only and legacy queries', async () => {
+  const f = fixture();
+  try {
+    f.add('бот в тг', 'обычный');
+    f.add('бот', 'отправка в тг');
+    f.add('другое', 'бот', ['в', 'тг']);
+    f.add('ложный', 'бот', ['без совпадения']);
+    f.add('отдельный', 'тг', ['в']);
+    f.add('UI UX', 'обычный');
+    f.add('otherui', 'UI', ['UX']);
+    f.add('nul-case', 'маркер', ['начало\0ёж UI']);
+    const before = f.hash();
+    const snapshot = await complete(f.engine);
+    for (const schema of [3, 1]) {
+      if (schema === 1) {
+        const db = new DatabaseSync(join(f.options.storagePath, `hub-${f.pointer().published!}.sqlite`));
+        try { db.exec('DROP TABLE search_fields; DROP TABLE search_rows; PRAGMA user_version=1'); } finally { db.close(); }
+      }
+      for (const query of ['бот в тг', 'в бот тг', 'тг бот в']) {
+        const found = await f.engine.search(query, 1);
+        assert.equal(found.generation, snapshot.generation);
+        assert.deepEqual(new Map(found.matches.map((m) => [m.folderId.split('\\').pop(), m.rank])),
+          new Map([['бот в тг', 0], ['бот', 1], ['другое', 2]]));
+      }
+      assert.deepEqual(new Map((await f.engine.search('UI UX', 2)).matches.map((m) => [m.folderId.split('\\').pop(), m.rank])),
+        new Map([['ui ux', 0], ['otherui', 2]]));
+      for (const query of ['ёж маркер', 'ui маркер']) {
+        assert.deepEqual((await f.engine.search(query, 3)).matches.map((m) => m.folderId.split('\\').pop()), ['nul-case']);
+      }
+      assert.deepEqual((await f.engine.search('бот zz', 4)).matches, [], 'short words must not be ignored');
+    }
+    assert.deepEqual(f.hash(), before);
+  } finally { await f.close(); }
 });
 
 void test('FTS exact folder AND/ranks includes all titles, Unicode and literals but not paths or boundaries', async () => {

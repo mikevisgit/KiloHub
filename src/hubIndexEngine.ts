@@ -368,20 +368,26 @@ export class HubIndexEngine {
       } else {
         const modern = schema >= 2;
         if (!modern) db.function('hub_name', { deterministic: true }, (path) => normalizeSearchText(win32.basename(String(path))));
-        for (const [index, token] of query.tokens.entries()) {
+        const tokens = [...query.tokens].sort((a, b) => Math.min([...b].length, 3) - Math.min([...a].length, 3));
+        for (const [index, token] of tokens.entries()) {
           check();
+          const useTrigram = modern && [...token].length >= 3 && !token.includes('\0');
           // NUL terminates FTS tokenization, not instr. Always union those fields before exact verification.
           const candidates = modern
-            ? token.includes('\0') ? 'SELECT folder,field_rank AS rank,text FROM search_fields'
+            ? !useTrigram ? 'SELECT folder,field_rank AS rank,text FROM search_fields'
               : `SELECT folder,field_rank AS rank,text FROM search_fields WHERE search_fields MATCH ?
                  UNION ALL SELECT folder,field_rank AS rank,text FROM search_fields
                  WHERE rowid IN (SELECT row_id FROM search_rows WHERE has_nul=1)`
             : `SELECT folder,0 AS rank,hub_name(directory) AS text FROM sessions
                UNION ALL SELECT folder,1,title_norm FROM sessions
                UNION ALL SELECT s.folder,2,t.text FROM texts t JOIN sessions s ON s.id=t.session_id`;
-          const statement = db.prepare(`SELECT folder,min(rank) AS rank FROM (${candidates}) WHERE instr(text,?)>0 GROUP BY folder`);
-          const rows = modern && !token.includes('\0')
-            ? statement.iterate(`"${token.replace(/"/g, '""')}"`, token) : statement.iterate(token);
+          const parameters: string[] = [];
+          if (useTrigram) parameters.push(`"${token.replace(/"/g, '""')}"`);
+          const scope = index > 0 ? 'folder IN (SELECT value FROM json_each(?)) AND ' : '';
+          if (index > 0) parameters.push(JSON.stringify([...ranks.keys()]));
+          parameters.push(token);
+          const statement = db.prepare(`SELECT folder,min(rank) AS rank FROM (${candidates}) WHERE ${scope}instr(text,?)>0 GROUP BY folder`);
+          const rows = statement.iterate(...parameters);
           const found = new Set<string>();
           let count = 0;
           for (const row of rows) {

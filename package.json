@@ -2,7 +2,7 @@
   "name": "kilo-hub",
   "displayName": "Kilo Hub",
   "description": "Папки Kilo Code: автоматическое обновление, поиск по диалогам и вашим сообщениям.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "icon": "resources/kilo-hub.png",
   "publisher": "local",
   "private": true,

@@ -6,8 +6,8 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $sourceManifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'package.json') -Raw | ConvertFrom-Json
-if ($sourceManifest.version -ne '0.3.0') {
-    throw "Step 3 release requires package version 0.3.0, found $($sourceManifest.version)."
+if ($sourceManifest.version -ne '0.3.1') {
+    throw "Step 3 release requires package version 0.3.1, found $($sourceManifest.version)."
 }
 $artifactName = "$($sourceManifest.name)-$($sourceManifest.version)-win32-x64.vsix"
 $artifactCandidate = if ([string]::IsNullOrWhiteSpace($ArtifactPath)) {

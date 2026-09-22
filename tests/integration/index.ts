@@ -457,7 +457,7 @@ async function testSearchAndPicker(repositoryRoot: string): Promise<void> {
     send('sit', 1); await waitUntil(() => searches.length === 1);
     complete(0, [first.id]); await waitUntil(() => provider.currentState.search?.generation === 1);
     assert.deepEqual(provider.currentState.folders.map(({ id }) => id), [first.id]);
-    for (const query of ['ab', 'site по', 'e\u0301x', '😀a']) {
+    for (const query of ['ab', 'e\u0301x', '😀a']) {
       send(query, 2);
       assert.equal(searches.length, 1);
       assert.equal(provider.currentState.search?.appliedQuery, 'sit');
@@ -576,7 +576,7 @@ export async function run(): Promise<void> {
     assert.ok(extension);
     assertManifest(extension.packageJSON);
     const manifest = extension.packageJSON;
-    assert.equal(manifest.version, '0.3.0');
+    assert.equal(manifest.version, '0.3.1');
     assert.equal(manifest.icon, 'resources/kilo-hub.png');
     assert.deepEqual(sorted(manifest.activationEvents), sorted(['onStartupFinished', 'onCommand:kiloHub.refresh', 'onView:kiloHub.folders']));
     assert.deepEqual(sorted(manifest.contributes.commands.map(({ command }) => command)), sorted(COMMAND_IDS));
@@ -604,7 +604,9 @@ export async function run(): Promise<void> {
     assert.deepEqual(openFolderOptions('here'), { forceReuseWindow: true });
     assert.deepEqual(openFolderOptions('newWindow'), { forceNewWindow: true });
   } finally {
-    const lifecycle = await import(pathToFileURL(join(repositoryRoot, 'build', 'extension.js')).href) as { deactivate(): Promise<void> };
+    const activeExtension = vscode.extensions.getExtension(EXTENSION_ID);
+    assert.ok(activeExtension, 'The activated extension must still be registered for teardown.');
+    const lifecycle = await import(pathToFileURL(join(activeExtension.extensionPath, 'build', 'extension.js')).href) as { deactivate(): Promise<void> };
     await lifecycle.deactivate();
     delete process.env.KILO_DB;
     delete process.env.KILO_HUB_SYNTHETIC_TEST;

@@ -19,7 +19,7 @@ export const WEBVIEW_STATE_MESSAGES = Object.freeze({
   initialError: 'Не удалось обновить данные. Повторим автоматически',
   refreshError: 'Не удалось обновить данные. Повторим автоматически',
   noResults: 'Папки не найдены',
-  shortQuery: 'Введите не менее 3 символов в каждом слове',
+  shortQuery: 'Введите не менее 3 символов',
   longQuery: 'Поисковый запрос слишком длинный',
 });
 
