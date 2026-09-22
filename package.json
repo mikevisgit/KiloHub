@@ -1,8 +1,8 @@
 {
   "name": "kilo-hub",
   "displayName": "Kilo Hub",
-  "description": "Локальный read-only список папок с диалогами Kilo Code.",
-  "version": "0.2.3",
+  "description": "Папки Kilo Code: автоматическое обновление, поиск по диалогам и вашим сообщениям.",
+  "version": "0.3.0",
   "icon": "resources/kilo-hub.png",
   "publisher": "local",
   "private": true,

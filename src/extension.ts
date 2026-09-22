@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import {
   executeFolderAction,
   registerKiloHubCommands,
+  showFolderPicker,
 } from './commands.js';
 import type { WorkspaceDescriptor } from './currentFolder.js';
 import { sanitizeDiagnostic } from './diagnostics.js';
@@ -63,6 +64,7 @@ export function activate(context: vscode.ExtensionContext): { getIndexSnapshot()
     loadFolders: () => Promise.resolve(index.snapshot.folders),
     workspaceDescriptor: describeWorkspace,
     executeAction: (action, folder) => executeFolderAction(action, folder, output),
+    pickFolder: showFolderPicker,
   });
   const viewRegistration = vscode.window.registerWebviewViewProvider(
     KILO_HUB_VIEW_ID,

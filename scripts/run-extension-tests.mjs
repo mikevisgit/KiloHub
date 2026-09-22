@@ -5,6 +5,8 @@ import { runTests } from '@vscode/test-electron';
 
 import { prepareIsolatedTestHost } from './isolated-test-host.mjs';
 
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '1';
+
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const version = process.argv[2] ?? '1.105.1';
 const expectedRuntime = version === '1.105.1'

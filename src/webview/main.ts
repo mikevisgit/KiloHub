@@ -2,9 +2,11 @@ import { AccordionController } from './accordion.js';
 import type { AccordionItem } from './accordion.js';
 import { TooltipController } from './tooltip.js';
 import type { TooltipRegistration } from './tooltip.js';
+import { parseSearchQuery } from '../searchQuery.js';
 import {
   PROTOCOL_VERSION,
   WEBVIEW_PROTOCOL_LIMITS,
+  WEBVIEW_STATE_MESSAGES,
   shouldApplyHostMessage,
 } from '../webviewProtocol.js';
 import type {
@@ -53,6 +55,8 @@ interface FolderView {
   readonly name: HTMLSpanElement;
   readonly activity: HTMLSpanElement;
   readonly missingLabel: HTMLSpanElement;
+  readonly temporaryLabel: HTMLSpanElement;
+  readonly temporaryExplanation: HTMLParagraphElement;
   readonly details: HTMLDivElement;
   readonly detail: HTMLDivElement;
   readonly actions: HTMLDivElement;
@@ -76,6 +80,9 @@ type RgbaColor = readonly [number, number, number, number];
 
 const INFO_LABEL = 'Здесь собраны папки, в которых вы работали с Kilo. Чтобы вернуться к работе, выберите папку и откройте её.';
 const UNKNOWN_DATE = 'Дата неизвестна';
+const PLUS_LABEL = 'Начать работу в новой папке';
+const TEMPORARY_LABEL = 'Пока без диалогов Kilo';
+const TEMPORARY_EXPLANATION = 'Эта папка появится в истории после начала общения с Kilo. Информация о диалогах появится здесь автоматически.';
 const DAY_MILLISECONDS = 86_400_000;
 const RENDER_CHUNK_SIZE = 50;
 const ACTIVITY_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
@@ -419,7 +426,7 @@ function applyFolderColorClass(view: FolderView): void {
 }
 
 function actionAllowed(folder: HubFolderDto, action: FolderAction): boolean {
-  return folder.available && (!folder.current || action === 'revealInExplorer');
+  return !folder.temporary && folder.available && (!folder.current || action === 'revealInExplorer');
 }
 
 function visibleActions(folder: HubFolderDto): readonly FolderAction[] {
@@ -452,17 +459,48 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
   info.textContent = 'ⓘ';
   info.setAttribute('aria-label', INFO_LABEL);
   info.dataset.key = semanticKey('info');
-  intro.append(title, info);
+  const plus = createElement(document, 'button', 'icon-button plus');
+  plus.type = 'button';
+  plus.textContent = '+';
+  plus.setAttribute('aria-label', PLUS_LABEL);
+  plus.dataset.key = semanticKey('plus');
+  intro.append(title, info, plus);
+  const searchRow = createElement(document, 'div', 'search-row');
+  const searchInput = createElement(document, 'input', 'search-input');
+  searchInput.type = 'text';
+  searchInput.placeholder = 'Поиск по папкам и диалогам';
+  searchInput.setAttribute('aria-label', 'Поиск по папкам, диалогам и вашим сообщениям');
+  searchInput.autocomplete = 'off';
+  searchInput.spellcheck = false;
+  searchInput.dataset.key = semanticKey('search');
+  const clear = createElement(document, 'button', 'icon-button search-clear');
+  clear.type = 'button';
+  clear.textContent = '×';
+  clear.setAttribute('aria-label', 'Сбросить поиск');
+  clear.dataset.key = semanticKey('clear-search');
+  searchRow.append(searchInput, clear);
+  const searchError = createElement(document, 'p', 'search-error');
+  searchError.id = 'search-error';
+  searchError.setAttribute('role', 'alert');
+  searchError.hidden = true;
+  searchInput.setAttribute('aria-describedby', searchError.id);
+  const resetSearch = createElement(document, 'button', 'reset-search');
+  resetSearch.type = 'button';
+  resetSearch.textContent = 'Сбросить поиск';
+  resetSearch.dataset.key = semanticKey('reset-search');
+  resetSearch.hidden = true;
 
   const status = createElement(document, 'p', 'view-status');
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   const folders = createElement(document, 'div', 'folders');
   folders.setAttribute('role', 'list');
-  hub.append(intro, status, folders);
+  hub.append(intro, searchRow, searchError, status, resetSearch, folders);
   appRoot.replaceChildren(hub);
 
   const tooltipController = new TooltipController(hub, { environment, graceMs: 0 });
+  tooltipController.register(info, INFO_LABEL);
+  tooltipController.register(plus, PLUS_LABEL);
   const folderViews = new Map<string, FolderView>();
   let accordionController: AccordionController | null = null;
   let hostState: HostToBrowserMessage | null = null;
@@ -474,6 +512,27 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
   let renderGeneration = 0;
   let pendingFocus: FocusSnapshot | null = null;
   let disposed = false;
+  let queryGeneration = 0;
+  let composing = false;
+  let focusIntent = 0;
+
+  function showQueryError(reason: 'short-token' | 'too-long' | null): void {
+    searchError.textContent = reason === 'short-token' ? WEBVIEW_STATE_MESSAGES.shortQuery
+      : reason === 'too-long' ? WEBVIEW_STATE_MESSAGES.longQuery : '';
+    searchError.hidden = reason === null;
+    searchInput.setAttribute('aria-invalid', String(reason !== null));
+  }
+
+  function applySearch(reset = false): void {
+    const raw = reset ? '' : searchInput.value;
+    const parsed = parseSearchQuery(raw);
+    if (parsed.kind === 'invalid') { showQueryError(parsed.reason); return; }
+    if (parsed.kind === 'reset') searchInput.value = '';
+    showQueryError(null);
+    queryGeneration += 1;
+    renderGeneration += 1;
+    vscode.postMessage({ type: 'applySearch', version: PROTOCOL_VERSION, query: raw, generation: queryGeneration });
+  }
 
   function persist(): void {
     if (disposed) return;
@@ -529,7 +588,9 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
     const activity = createElement(document, 'span', 'activity');
     const missingLabel = createElement(document, 'span', 'missing-label');
     missingLabel.textContent = 'Папка не найдена';
-    identity.append(currentLabel, name, activity, missingLabel);
+    const temporaryLabel = createElement(document, 'span', 'temporary-label');
+    temporaryLabel.textContent = TEMPORARY_LABEL;
+    identity.append(currentLabel, name, activity, missingLabel, temporaryLabel);
     const chevron = createElement(document, 'span', 'chevron');
     chevron.textContent = '⌄';
     chevron.setAttribute('aria-hidden', 'true');
@@ -537,6 +598,8 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
 
     const details = createElement(document, 'div', 'detail-wrap');
     const detail = createElement(document, 'div', 'detail');
+    const temporaryExplanation = createElement(document, 'p', 'temporary-explanation');
+    temporaryExplanation.textContent = TEMPORARY_EXPLANATION;
     const actions = createElement(document, 'div', 'actions');
     const actionButtons = Object.fromEntries(FOLDER_ACTIONS.map((action) => [
       action,
@@ -561,6 +624,8 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
       name,
       activity,
       missingLabel,
+      temporaryLabel,
+      temporaryExplanation,
       details,
       detail,
       actions,
@@ -614,7 +679,7 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
     const parts = [view.dto.name];
     if (view.dto.current && view.dto.available) parts.push('Вы сейчас здесь');
     if (!view.dto.available) parts.push('Папка не найдена');
-    parts.push(view.activity.textContent ?? UNKNOWN_DATE);
+    parts.push(view.dto.temporary ? TEMPORARY_LABEL : view.activity.textContent ?? UNKNOWN_DATE);
     view.header.setAttribute('aria-label', parts.join('. '));
   }
 
@@ -626,10 +691,19 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
     view.name.textContent = dto.name;
     view.currentLabel.hidden = !dto.current || !dto.available;
     view.missingLabel.hidden = dto.available;
+    view.temporaryLabel.hidden = !dto.temporary;
+    view.activity.hidden = dto.temporary === true;
     view.pathTooltip.update(dto.path);
     view.activity.textContent = formatBrowserRelativeActivity(dto.activity, now());
     updateFolderAria(view);
     updateConversationViews(view, dto);
+    if (dto.temporary) {
+      view.history.remove();
+      view.detail.append(view.temporaryExplanation);
+    } else {
+      view.temporaryExplanation.remove();
+      view.detail.append(view.history);
+    }
 
     const actions = visibleActions(dto);
     const activeElement = document.activeElement;
@@ -697,7 +771,7 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
   function restoreFocus(snapshot: FocusSnapshot | null): void {
     if (snapshot === null) return;
     for (const element of Array.from(appRoot.querySelectorAll<HTMLElement>('[data-key]'))) {
-      if (element.dataset.key === snapshot.key) {
+      if (element.dataset.key === snapshot.key && !element.closest('[hidden], [inert]')) {
         element.focus({ preventScroll: true });
         return;
       }
@@ -720,7 +794,7 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
         }
       }
     }
-    info.focus({ preventScroll: true });
+    searchInput.focus({ preventScroll: true });
   }
 
   function yieldRender(): Promise<void> {
@@ -743,7 +817,7 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
       if (!renderIsCurrent(generation)) return false;
     }
     pendingFocus = captureFocus() ?? pendingFocus;
-    const focusSnapshot = pendingFocus;
+    let focusSnapshot = pendingFocus;
     const previousScrollTop = restoredScrollTop ?? folders.scrollTop;
     if (pendingExpandedFolderKey !== null) {
       const matches = state.folders.filter(({ id }) => persistedFolderKey(id) === pendingExpandedFolderKey);
@@ -762,8 +836,10 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
       folderViews.delete(id);
       processed += 1;
       if (chunked && processed % RENDER_CHUNK_SIZE === 0 && processed < totalWork) {
+        const intent = focusIntent;
         await yieldRender();
         if (!renderIsCurrent(generation)) return false;
+        if (intent !== focusIntent) focusSnapshot = captureFocus();
       }
     }
     for (const dto of state.folders) {
@@ -777,8 +853,10 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
       folders.append(view.element);
       processed += 1;
       if (chunked && processed % RENDER_CHUNK_SIZE === 0 && processed < totalWork) {
+        const intent = focusIntent;
         await yieldRender();
         if (!renderIsCurrent(generation)) return false;
+        if (intent !== focusIntent) focusSnapshot = captureFocus();
       }
     }
     if (!renderIsCurrent(generation)) return false;
@@ -795,10 +873,13 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
 
   function applyState(value: unknown, restoredScrollTop?: number): boolean {
     if (!shouldApplyHostMessage(value, lastAppliedRevision)) return false;
+    if (value.search && value.search.generation < queryGeneration) return false;
     hostState = value;
     lastAppliedRevision = value.revision;
     const generation = ++renderGeneration;
     status.textContent = value.message ?? '';
+    resetSearch.hidden = value.message !== WEBVIEW_STATE_MESSAGES.noResults;
+    if (value.search?.error) showQueryError(value.search.error);
     hub.setAttribute('aria-busy', String(value.busy));
     void renderState(value, generation, restoredScrollTop).then((completed) => {
       if (completed && renderIsCurrent(generation)) persist();
@@ -842,6 +923,24 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
     if (applied) restoredScrollTop = undefined;
   };
   const onScroll = (): void => persist();
+  const onFocusIntent = (event: Event): void => {
+    if (event.type === 'blur' ? event.target === environment
+      : event.target !== document.body && event.target !== document.documentElement) {
+      focusIntent += 1;
+      if (event.type === 'blur' || !appRoot.contains(event.target as Node)) pendingFocus = null;
+    }
+  };
+  const onPlus = (): void => vscode.postMessage({ type: 'pickFolder', version: PROTOCOL_VERSION });
+  const onResetSearch = (): void => { applySearch(true); searchInput.focus({ preventScroll: true }); };
+  const onSearchKey = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') { event.preventDefault(); applySearch(true); }
+    else if (event.key === 'Enter' && !composing && !event.isComposing && event.keyCode !== 229) {
+      event.preventDefault(); applySearch();
+    }
+  };
+  const onSearchInput = (): void => showQueryError(null);
+  const onCompositionStart = (): void => { composing = true; };
+  const onCompositionEnd = (): void => { composing = false; };
   const onFocus = (): void => {
     updateDates();
     updateTheme();
@@ -853,7 +952,16 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
   environment.addEventListener('message', onMessage as EventListener);
   environment.addEventListener('focus', onFocus);
   document.addEventListener('visibilitychange', onVisibilityChange);
+  document.addEventListener('focusin', onFocusIntent);
+  environment.addEventListener('blur', onFocusIntent);
   folders.addEventListener('scroll', onScroll);
+  plus.addEventListener('click', onPlus);
+  clear.addEventListener('click', onResetSearch);
+  resetSearch.addEventListener('click', onResetSearch);
+  searchInput.addEventListener('keydown', onSearchKey);
+  searchInput.addEventListener('input', onSearchInput);
+  searchInput.addEventListener('compositionstart', onCompositionStart);
+  searchInput.addEventListener('compositionend', onCompositionEnd);
 
   const MutationObserverConstructor = (environment as Window & typeof globalThis).MutationObserver;
   const themeObserver = new MutationObserverConstructor(updateTheme);
@@ -889,7 +997,16 @@ export function createWebviewApp(options: WebviewAppOptions): WebviewApp {
       environment.removeEventListener('message', onMessage as EventListener);
       environment.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      document.removeEventListener('focusin', onFocusIntent);
+      environment.removeEventListener('blur', onFocusIntent);
       folders.removeEventListener('scroll', onScroll);
+      plus.removeEventListener('click', onPlus);
+      clear.removeEventListener('click', onResetSearch);
+      resetSearch.removeEventListener('click', onResetSearch);
+      searchInput.removeEventListener('keydown', onSearchKey);
+      searchInput.removeEventListener('input', onSearchInput);
+      searchInput.removeEventListener('compositionstart', onCompositionStart);
+      searchInput.removeEventListener('compositionend', onCompositionEnd);
       accordionController?.dispose();
       for (const view of folderViews.values()) disposeFolderView(view);
       tooltipController.dispose();

@@ -14,8 +14,30 @@ import {
   reliableIsoTimestamp,
 } from '../../src/presentation.js';
 import type { KiloConversation, KiloFolder } from '../../src/types.js';
+import { normalizeWindowsDirectory } from '../../src/projection.js';
 
 const NOW = Date.parse('2026-09-20T12:00:00.000Z');
+
+void test('search rank retains activity ties and temporary current matches name only', () => {
+  const folders = ['Alpha', 'Beta', 'Gamma', 'Delta'].map((name, index) => folder(name, name, `C:\\${name}`,
+    [{ id: name, title: `Title ${index}`, updatedAt: isoDaysAgo(index) }]));
+  const result = presentFolders(folders, { now: NOW, currentFolderId: 'Delta', matches: [
+    { folderId: 'Alpha', rank: 2 }, { folderId: 'Beta', rank: 0 },
+    { folderId: 'Gamma', rank: 1 }, { folderId: 'Delta', rank: 2 },
+  ] });
+  assert.deepEqual(result.map(({ id }) => id), ['Delta', 'Beta', 'Gamma', 'Alpha']);
+  assert.deepEqual(result[3].conversations, [{ id: 'Alpha', title: 'Title 0' }]);
+  const temporary = normalizeWindowsDirectory('C:\\pathonly\\Fresh');
+  assert.ok(temporary);
+  const options = { now: NOW, currentFolderId: null, temporaryCurrent: temporary, matches: [] };
+  assert.equal(presentFolders(folders, { ...options, tokens: ['pathonly'] }).length, 0);
+  assert.equal(presentFolders(folders, { ...options, tokens: ['fre', 'missing'] }).length, 0);
+  const matched = presentFolders(folders, { ...options, tokens: ['fre'] });
+  assert.equal(matched[0].temporary, true);
+  assert.equal(matched[0].activity, undefined);
+  assert.deepEqual(matched[0].conversations, []);
+  assert.equal(presentFolders(folders, { now: NOW, currentFolderId: 'Alpha', matches: [] }).length, 0);
+});
 
 function isoDaysAgo(days: number, hour = 10, minute = 5): string {
   return new Date(Date.UTC(2026, 8, 20 - days, hour, minute)).toISOString();

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  PROTOCOL_VERSION,
   WEBVIEW_STATE_MESSAGES,
   isCurrentRevision,
   isHostToBrowserMessage,
@@ -50,7 +51,7 @@ function succeed(
 void test('creates an immutable exact initial state at a validated revision', () => {
   const state = createInitialWebviewState();
   assert.deepEqual(state, {
-    version: 1,
+    version: PROTOCOL_VERSION,
     revision: 0,
     kind: 'initial',
     folders: [],
@@ -71,7 +72,7 @@ void test('covers initial loading, success, refresh, error retention and recover
   const initial = createInitialWebviewState();
   const loading = reduceWebviewState(initial, { type: 'loadRequested' });
   assert.deepEqual(loading, {
-    version: 1,
+    version: PROTOCOL_VERSION,
     revision: 1,
     kind: 'loading',
     folders: [],
@@ -125,7 +126,7 @@ void test('covers initial failure and retry without ever retaining folders', () 
     requestRevision: loading.revision,
   });
   assert.deepEqual(failed, {
-    version: 1,
+    version: PROTOCOL_VERSION,
     revision: 2,
     kind: 'initialError',
     folders: [],

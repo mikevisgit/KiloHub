@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = 1 as const;
+export const PROTOCOL_VERSION = 2 as const;
 
 export const WEBVIEW_PROTOCOL_LIMITS = Object.freeze({
   idLength: 512,
@@ -18,6 +18,9 @@ export const WEBVIEW_STATE_MESSAGES = Object.freeze({
   refreshing: 'Подготавливаем поиск…',
   initialError: 'Не удалось обновить данные. Повторим автоматически',
   refreshError: 'Не удалось обновить данные. Повторим автоматически',
+  noResults: 'Папки не найдены',
+  shortQuery: 'Введите не менее 3 символов в каждом слове',
+  longQuery: 'Поисковый запрос слишком длинный',
 });
 
 export interface HubConversationDto {
@@ -36,6 +39,7 @@ export interface HubFolderDto {
   readonly monogram: string;
   readonly colorSlot: number | null;
   readonly conversations: readonly HubConversationDto[];
+  readonly temporary?: true;
 }
 
 export type FolderAction = 'openHere' | 'openNewWindow' | 'revealInExplorer';
@@ -61,7 +65,15 @@ export interface BrowserFolderActionMessage {
 export type BrowserToHostMessage =
   | BrowserReadyMessage
   | BrowserRefreshMessage
+  | Readonly<{ type: 'applySearch'; version: typeof PROTOCOL_VERSION; query: string; generation: number }>
+  | Readonly<{ type: 'pickFolder'; version: typeof PROTOCOL_VERSION }>
   | BrowserFolderActionMessage;
+
+export interface SearchState {
+  readonly generation: number;
+  readonly appliedQuery: string;
+  readonly error: 'short-token' | 'too-long' | null;
+}
 
 export type HubStateKind =
   | 'initial'
@@ -75,6 +87,7 @@ interface HubStateEnvelopeBase {
   readonly version: typeof PROTOCOL_VERSION;
   readonly revision: number;
   readonly folders: readonly HubFolderDto[];
+  readonly search?: SearchState;
 }
 
 export interface HubInitialStateEnvelope extends HubStateEnvelopeBase {
@@ -91,7 +104,7 @@ export interface HubLoadingStateEnvelope extends HubStateEnvelopeBase {
 
 export interface HubReadyStateEnvelope extends HubStateEnvelopeBase {
   readonly kind: 'ready';
-  readonly message: null | typeof WEBVIEW_STATE_MESSAGES.empty;
+  readonly message: null | typeof WEBVIEW_STATE_MESSAGES.empty | typeof WEBVIEW_STATE_MESSAGES.noResults;
   readonly busy: false;
 }
 
@@ -231,7 +244,7 @@ export function isHubFolderDto(value: unknown): value is HubFolderDto {
       'colorSlot',
       'conversations',
     ],
-    ['activity'],
+    ['activity', 'temporary'],
   );
   if (candidate === undefined) {
     return false;
@@ -248,7 +261,10 @@ export function isHubFolderDto(value: unknown): value is HubFolderDto {
     && (colorSlot === null
       || (typeof colorSlot === 'number' && Number.isInteger(colorSlot) && colorSlot >= 0 && colorSlot < 16))
     && isExactArray(candidate.conversations, WEBVIEW_PROTOCOL_LIMITS.conversationsPerFolder)
-    && candidate.conversations.every(isHubConversationDto);
+    && candidate.conversations.every(isHubConversationDto)
+    && (!Object.hasOwn(candidate, 'temporary') || (candidate.temporary === true
+      && candidate.current === true && candidate.available === true
+      && candidate.conversations.length === 0 && !Object.hasOwn(candidate, 'activity')));
 }
 
 export function isHubFolderArray(value: unknown): value is readonly HubFolderDto[] {
@@ -286,13 +302,17 @@ function isFolderAction(value: unknown): value is FolderAction {
 }
 
 export function isBrowserToHostMessage(value: unknown): value is BrowserToHostMessage {
-  const header = asExactObject(value, ['type', 'version'], ['revision', 'folderId', 'action']);
+  const header = asExactObject(value, ['type', 'version'], ['revision', 'folderId', 'action', 'query', 'generation']);
   if (header === undefined || header.version !== PROTOCOL_VERSION) {
     return false;
   }
 
-  if (header.type === 'ready' || header.type === 'refresh') {
+  if (header.type === 'ready' || header.type === 'refresh' || header.type === 'pickFolder') {
     return asExactObject(value, ['type', 'version']) !== undefined;
+  }
+  if (header.type === 'applySearch') {
+    return asExactObject(value, ['type', 'version', 'query', 'generation']) !== undefined
+      && isProtocolRevision(header.generation) && isBoundedString(header.query, 4096, true);
   }
   if (header.type !== 'folderAction') {
     return false;
@@ -309,12 +329,20 @@ export function isHostToBrowserMessage(value: unknown): value is HostToBrowserMe
   const candidate = asExactObject(
     value,
     ['version', 'revision', 'kind', 'folders', 'message', 'busy'],
+    ['search'],
   );
   if (candidate === undefined
     || candidate.version !== PROTOCOL_VERSION
     || !isProtocolRevision(candidate.revision)
     || !isHubFolderArray(candidate.folders)) {
     return false;
+  }
+
+  if (Object.hasOwn(candidate, 'search')) {
+    const search = asExactObject(candidate.search, ['generation', 'appliedQuery', 'error']);
+    if (!search || !isProtocolRevision(search.generation)
+      || !isBoundedString(search.appliedQuery, 12_288, true)
+      || !(search.error === null || search.error === 'short-token' || search.error === 'too-long')) return false;
   }
 
   switch (candidate.kind) {
@@ -326,7 +354,9 @@ export function isHostToBrowserMessage(value: unknown): value is HostToBrowserMe
         && candidate.busy === true;
     case 'ready':
       return candidate.busy === false
-        && candidate.message === (candidate.folders.length === 0 ? WEBVIEW_STATE_MESSAGES.empty : null);
+        && candidate.message === (candidate.folders.length === 0
+          ? ((candidate.search as SearchState | undefined)?.appliedQuery
+            ? WEBVIEW_STATE_MESSAGES.noResults : WEBVIEW_STATE_MESSAGES.empty) : null);
     case 'refreshing':
       return candidate.message === WEBVIEW_STATE_MESSAGES.refreshing && candidate.busy === true;
     case 'initialError':

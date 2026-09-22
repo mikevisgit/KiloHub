@@ -43,7 +43,7 @@ function readyMessage(revision = 1): HostToBrowserMessage {
   };
 }
 
-void test('accepts only the three exact browser-to-host message shapes', () => {
+void test('accepts exact browser-to-host message shapes', () => {
   assert.equal(isBrowserToHostMessage({ type: 'ready', version: PROTOCOL_VERSION }), true);
   assert.equal(isBrowserToHostMessage({ type: 'refresh', version: PROTOCOL_VERSION }), true);
 
@@ -70,6 +70,27 @@ void test('accepts only the three exact browser-to-host message shapes', () => {
     action: 'openHere',
     path: 'C:\\forged',
   }), false);
+});
+
+void test('search and picker reject forged properties and temporary cards enforce their invariant', () => {
+  const message = { type: 'applySearch', version: PROTOCOL_VERSION, query: 'alpha', generation: 1 };
+  assert.equal(isBrowserToHostMessage(message), true);
+  assert.equal(isBrowserToHostMessage({ ...message, query: '' }), true);
+  assert.equal(isBrowserToHostMessage({ ...message, query: 'a'.repeat(4097) }), false);
+  assert.equal(isBrowserToHostMessage({ ...message, generation: -1 }), false);
+  assert.equal(isBrowserToHostMessage({ ...message, path: 'C:\\forged' }), false);
+  assert.equal(isBrowserToHostMessage({ type: 'pickFolder', version: PROTOCOL_VERSION }), true);
+  assert.equal(isBrowserToHostMessage({ type: 'pickFolder', version: PROTOCOL_VERSION, path: 'C:\\forged' }), false);
+  const { activity: _activity, ...temporary } = folder({ temporary: true, current: true, conversations: [] });
+  void _activity;
+  assert.equal(isHubFolderDto(temporary), true);
+  assert.equal(isHubFolderDto({ ...temporary, current: false }), false);
+  assert.equal(isHubFolderDto({ ...temporary, available: false }), false);
+  assert.equal(isHubFolderDto({ ...temporary, activity: '2026-09-20T10:20:30.000Z' }), false);
+  const empty = { ...readyMessage(), folders: [], message: WEBVIEW_STATE_MESSAGES.noResults,
+    search: { generation: 1, appliedQuery: 'alpha', error: null } };
+  assert.equal(isHostToBrowserMessage(empty), true);
+  assert.equal(isHostToBrowserMessage({ ...empty, search: { ...empty.search, corpus: 'forged' } }), false);
 });
 
 void test('rejects malformed, prototype-shaped, accessor and symbol-key messages without throwing', () => {
@@ -236,18 +257,18 @@ void test('rejects hostile prototypes at every nested DTO level', () => {
 void test('accepts every exact host state and rejects inconsistent discriminants', () => {
   const folders = [folder()];
   const states: HostToBrowserMessage[] = [
-    { version: 1, revision: 0, kind: 'initial', folders: [], message: null, busy: false },
+    { version: PROTOCOL_VERSION, revision: 0, kind: 'initial', folders: [], message: null, busy: false },
     {
-      version: 1,
+      version: PROTOCOL_VERSION,
       revision: 1,
       kind: 'loading',
       folders: [],
       message: WEBVIEW_STATE_MESSAGES.loading,
       busy: true,
     },
-    { version: 1, revision: 2, kind: 'ready', folders, message: null, busy: false },
+    { version: PROTOCOL_VERSION, revision: 2, kind: 'ready', folders, message: null, busy: false },
     {
-      version: 1,
+      version: PROTOCOL_VERSION,
       revision: 3,
       kind: 'ready',
       folders: [],
@@ -255,7 +276,7 @@ void test('accepts every exact host state and rejects inconsistent discriminants
       busy: false,
     },
     {
-      version: 1,
+      version: PROTOCOL_VERSION,
       revision: 4,
       kind: 'refreshing',
       folders,
@@ -263,7 +284,7 @@ void test('accepts every exact host state and rejects inconsistent discriminants
       busy: true,
     },
     {
-      version: 1,
+      version: PROTOCOL_VERSION,
       revision: 5,
       kind: 'initialError',
       folders: [],
@@ -271,7 +292,7 @@ void test('accepts every exact host state and rejects inconsistent discriminants
       busy: false,
     },
     {
-      version: 1,
+      version: PROTOCOL_VERSION,
       revision: 6,
       kind: 'refreshError',
       folders,
@@ -290,7 +311,7 @@ void test('accepts every exact host state and rejects inconsistent discriminants
   assert.equal(isHostToBrowserMessage({ ...states[4], message: 'Обновление' }), false);
   assert.equal(isHostToBrowserMessage({ ...states[5], folders }), false);
   assert.equal(isHostToBrowserMessage({ ...states[6], kind: 'unknown' }), false);
-  assert.equal(isHostToBrowserMessage({ ...states[6], version: 2 }), false);
+  assert.equal(isHostToBrowserMessage({ ...states[6], version: PROTOCOL_VERSION + 1 }), false);
 
   const tooManyFolders = Array.from(
     { length: WEBVIEW_PROTOCOL_LIMITS.folders + 1 },

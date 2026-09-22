@@ -6,8 +6,8 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $sourceManifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'package.json') -Raw | ConvertFrom-Json
-if ($sourceManifest.version -ne '0.2.3') {
-    throw "Step 2 release requires package version 0.2.3, found $($sourceManifest.version)."
+if ($sourceManifest.version -ne '0.3.0') {
+    throw "Step 3 release requires package version 0.3.0, found $($sourceManifest.version)."
 }
 $artifactName = "$($sourceManifest.name)-$($sourceManifest.version)-win32-x64.vsix"
 $artifactCandidate = if ([string]::IsNullOrWhiteSpace($ArtifactPath)) {
@@ -27,6 +27,7 @@ try {
         'extension/LICENSE.txt',
         'extension/build/extension.js',
         'extension/build/kiloDataWorker.js',
+        'extension/build/hubIndexWorker.js',
         'extension/build/webview/webview.css',
         'extension/build/webview/webview.js',
         'extension/docs/release-notes.md',
@@ -85,7 +86,7 @@ try {
         throw 'Unexpected extensionKind.'
     }
 
-    $expectedActivation = @('onCommand:kiloHub.refresh', 'onView:kiloHub.folders') | Sort-Object
+    $expectedActivation = @('onStartupFinished', 'onCommand:kiloHub.refresh', 'onView:kiloHub.folders') | Sort-Object
     if (@(Compare-Object $expectedActivation @($manifest.activationEvents | Sort-Object)).Count -ne 0) {
         throw 'Unexpected activation events.'
     }
@@ -141,7 +142,7 @@ try {
         throw 'Packaged Details README does not match the canonical description.'
     }
 
-    foreach ($bundleName in @('extension.js', 'kiloDataWorker.js', 'webview/webview.js', 'webview/webview.css')) {
+    foreach ($bundleName in @('extension.js', 'kiloDataWorker.js', 'hubIndexWorker.js', 'webview/webview.js', 'webview/webview.css')) {
         $bundleEntry = $archive.GetEntry("extension/build/$bundleName")
         $bundleStream = $bundleEntry.Open()
         $sha256 = [System.Security.Cryptography.SHA256]::Create()

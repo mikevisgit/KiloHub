@@ -52,6 +52,7 @@ function copyFolders(folders: readonly HubFolderDto[]): readonly HubFolderDto[] 
       colorSlot: folder.colorSlot,
       conversations,
       ...(folder.activity === undefined ? {} : { activity: folder.activity }),
+      ...(folder.temporary ? { temporary: true as const } : {}),
     };
     return Object.freeze(copy);
   }));

@@ -1,5 +1,6 @@
 import { normalizeWindowsDirectory } from './projection.js';
-import type { KiloConversation, KiloFolder } from './types.js';
+import type { KiloConversation, KiloFolder, NormalizedWindowsDirectory } from './types.js';
+import { normalizeSearchText } from './searchQuery.js';
 import type { HubConversationDto, HubFolderDto } from './webviewProtocol.js';
 
 const UNKNOWN_DATE = 'Дата неизвестна';
@@ -34,6 +35,9 @@ export interface RelativeActivityOptions {
 export interface PresentationOptions {
   readonly currentFolderId: string | null;
   readonly now: Date | number;
+  readonly temporaryCurrent?: NormalizedWindowsDirectory | null;
+  readonly matches?: readonly { folderId: string; rank: 0 | 1 | 2 }[];
+  readonly tokens?: readonly string[];
 }
 
 export interface AdaptivePaletteOptions {
@@ -410,5 +414,17 @@ export function presentFolders(
       || compareText(left.pathKey, right.pathKey)
       || compareText(left.dto.id, right.dto.id);
   });
-  return presented.map(({ dto }) => dto);
+  const ranks = options.matches === undefined ? null : new Map(options.matches.map(({ folderId, rank }) => [folderId, rank]));
+  const result: HubFolderDto[] = presented.map(({ dto }) => dto)
+    .filter(({ id }) => ranks === null || ranks.has(id));
+  if (ranks !== null) result.sort((left, right) => Number(right.current) - Number(left.current)
+    || (ranks.get(left.id) ?? 0) - (ranks.get(right.id) ?? 0));
+  const temporary = options.temporaryCurrent;
+  if (temporary && !folders.some(({ id }) => id === temporary.key)
+    && (options.tokens ?? []).every((token) => normalizeSearchText(temporary.name).includes(token))) {
+    result.unshift({ id: temporary.key, name: temporary.name, path: temporary.path,
+      current: true, available: true, temporary: true, conversations: [],
+      monogram: createFolderMonogram(temporary.name, temporary.path), colorSlot: folderColorSlot(temporary.path) });
+  }
+  return result;
 }

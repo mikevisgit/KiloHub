@@ -49,6 +49,11 @@ void test('production CSS keeps 260/320/400 layouts horizontally bounded', async
   assert.match(css, /\.detail\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/su);
   assert.match(css, /\.actions\s*\{[^}]*width:\s*100%;[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/su);
   assert.match(css, /\.action\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/su);
+  assert.match(css, /\.search-row\s*\{[^}]*display:\s*flex;[^}]*min-width:\s*0;/su);
+  assert.match(css, /\.search-input\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;[^}]*flex:\s*1;/su);
+  assert.match(css, /\.search-input\s*\{[^}]*--vscode-input-background[^}]*--vscode-input-foreground[^}]*font:\s*inherit;/su);
+  assert.match(css, /\.search-error\s*\{[^}]*overflow-wrap:\s*anywhere;/su);
+  assert.match(css, /\.temporary-explanation\s*\{[^}]*overflow-wrap:\s*anywhere;/su);
   assert.match(css, /\.folder-name\s*\{[^}]*overflow-wrap:\s*anywhere;/su);
   assert.match(css, /\.conversation\s*\{[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/su);
   assert.doesNotMatch(css, /@media\s*\([^)]*(?:width|zoom)[^)]*\)[^{]*\{[^}]*font-size/isu);

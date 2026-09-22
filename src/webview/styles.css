@@ -98,7 +98,7 @@ button {
   line-height: 1;
 }
 
-.refresh {
+.plus {
   font-size: calc(var(--hub-base) * 1.2307692308);
 }
 
@@ -120,6 +120,51 @@ button {
 
 .view-status:empty {
   display: none;
+}
+
+.search-row {
+  display: flex;
+  flex: none;
+  min-width: 0;
+  margin: 0 var(--hub-row-x) var(--hub-gap);
+  gap: calc(var(--hub-base) * 0.3076923077);
+}
+
+.search-input {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  padding: calc(var(--hub-base) * 0.3846153846);
+  border: 1px solid var(--vscode-input-border, var(--hub-border));
+  background: var(--vscode-input-background, var(--hub-bg));
+  color: var(--vscode-input-foreground, var(--hub-fg));
+  font: inherit;
+}
+
+.search-input::placeholder {
+  color: var(--vscode-input-placeholderForeground, var(--hub-muted));
+}
+
+.search-error {
+  margin: 0 var(--hub-row-x) var(--hub-gap);
+  color: var(--vscode-errorForeground, var(--hub-fg));
+  overflow-wrap: anywhere;
+}
+
+.reset-search {
+  align-self: flex-start;
+  margin: 0 var(--hub-row-x) var(--hub-gap);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--vscode-textLink-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.temporary-explanation {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .folders {
@@ -213,6 +258,7 @@ button {
 
 .current-label,
 .activity,
+.temporary-label,
 .missing-label {
   display: block;
   color: var(--hub-muted);

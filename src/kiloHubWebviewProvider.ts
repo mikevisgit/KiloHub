@@ -6,12 +6,13 @@ import {
   type FolderAction,
   type FolderCommandResolver,
 } from './commands.js';
-import { resolveCurrentFolder } from './currentFolder.js';
+import { resolveCurrentFolder, resolveTemporaryCurrentFolder } from './currentFolder.js';
+import { parseSearchQuery } from './searchQuery.js';
 import type { WorkspaceDescriptor } from './currentFolder.js';
 import { sanitizeDiagnostic } from './diagnostics.js';
 import { presentFolders } from './presentation.js';
 import type { KiloFolder } from './types.js';
-import type { HubIndexSnapshot } from './hubIndexProtocol.js';
+import type { HubIndexSnapshot, HubSearchResult } from './hubIndexProtocol.js';
 import {
   isBrowserToHostMessage,
   isCurrentRevision,
@@ -22,6 +23,7 @@ import type {
   BrowserFolderActionMessage,
   BrowserToHostMessage,
   HostToBrowserMessage,
+  HubFolderDto,
 } from './webviewProtocol.js';
 import {
   createInitialWebviewState,
@@ -53,9 +55,11 @@ export interface KiloHubWebviewDependencies {
   readonly revealView?: () => Thenable<unknown>;
   readonly now?: () => Date;
   readonly browserReadyTimeoutMs?: number;
+  readonly pickFolder?: () => Promise<void>;
   readonly index?: {
     subscribe(listener: (snapshot: HubIndexSnapshot) => void): vscode.Disposable;
     poll(): void;
+    search(query: string, queryGeneration: number): Promise<HubSearchResult>;
   };
 }
 
@@ -76,6 +80,10 @@ implements vscode.WebviewViewProvider, vscode.Disposable, FolderCommandResolver 
   private disposed = false;
   private presentationGeneration = 0;
   private indexSnapshot: HubIndexSnapshot | undefined;
+  private appliedQuery = '';
+  private queryGeneration = 0;
+  private pickerInFlight = false;
+  private unfiltered: { snapshot: HubIndexSnapshot; folders: readonly HubFolderDto[] } | undefined;
   private readonly browserReadyWaiters = new Set<BrowserReadyWaiter>();
 
   public constructor(private readonly dependencies: KiloHubWebviewDependencies) {
@@ -88,36 +96,59 @@ implements vscode.WebviewViewProvider, vscode.Disposable, FolderCommandResolver 
     if (this.disposed) return;
     this.indexSnapshot = snapshot;
     const generation = ++this.presentationGeneration;
+    const viewGeneration = this.viewGeneration;
+    const queryGeneration = this.queryGeneration;
+    const parsed = parseSearchQuery(this.appliedQuery);
     // Invalidate final action guards immediately, before filesystem/workspace awaits.
     this.state = { ...this.state, revision: this.state.revision + 1 };
     const folders = Object.freeze([...snapshot.folders]);
     try {
-      const presented = await this.createPresentation(folders);
-      if (this.disposed || generation !== this.presentationGeneration) return;
+      const workspace = await this.dependencies.workspaceDescriptor();
+      if (this.disposed || generation !== this.presentationGeneration || viewGeneration !== this.viewGeneration) return;
+      const current = resolveCurrentFolder(workspace, folders);
+      const options = { currentFolderId: current.folderId, now: this.dependencies.now?.() ?? new Date(),
+        temporaryCurrent: resolveTemporaryCurrentFolder(workspace, folders, snapshot.complete && snapshot.health === 'ready') };
+      const unfiltered = presentFolders(folders, options);
+      if (!isHubFolderArray(unfiltered)) throw new Error('display-overflow');
+      this.unfiltered = { snapshot, folders: unfiltered };
+      const result = parsed.kind === 'query' && snapshot.generation
+        ? await this.dependencies.index?.search(this.appliedQuery, queryGeneration) : undefined;
+      if (this.disposed || generation !== this.presentationGeneration || viewGeneration !== this.viewGeneration
+        || queryGeneration !== this.queryGeneration) return;
+      if (result && (result.generation !== snapshot.generation || result.indexRevision !== snapshot.indexRevision
+        || result.queryGeneration !== queryGeneration)) return;
+      const presented = presentFolders(folders, {
+        ...options,
+        ...(parsed.kind === 'query' ? { matches: result?.matches ?? [], tokens: parsed.tokens } : {}),
+      });
       if (!isHubFolderArray(presented)) throw new Error('display-overflow');
-      const envelope = { version: this.state.version, revision: this.state.revision + 1, folders: presented };
-      const failed = snapshot.health === 'stale' || snapshot.health === 'unavailable';
-      const state: WebviewState = failed
-        ? presented.length > 0
-          ? { ...envelope, kind: 'refreshError', busy: false, message: WEBVIEW_STATE_MESSAGES.refreshError }
-          : { ...envelope, kind: 'initialError', busy: false, message: WEBVIEW_STATE_MESSAGES.initialError }
-        : !snapshot.complete
-          ? presented.length > 0
-            ? { ...envelope, kind: 'refreshing', busy: true, message: WEBVIEW_STATE_MESSAGES.refreshing }
-            : { ...envelope, kind: 'loading', busy: true, message: WEBVIEW_STATE_MESSAGES.loading }
-          : { ...envelope, kind: 'ready', busy: false, message: presented.length ? null : WEBVIEW_STATE_MESSAGES.empty };
       this.folders = folders;
-      this.state = state;
+      this.state = this.indexedState(snapshot, presented);
       await this.publishState();
     } catch {
-      if (this.disposed || generation !== this.presentationGeneration) return;
-      const envelope = { version: this.state.version, revision: this.state.revision + 1, folders: this.state.folders };
-      this.state = this.folders.length
+      if (this.disposed || generation !== this.presentationGeneration || viewGeneration !== this.viewGeneration) return;
+      const retained = this.state.search?.appliedQuery === this.appliedQuery ? this.state.folders : [];
+      const envelope = { version: this.state.version, revision: this.state.revision + 1, folders: retained,
+        search: { generation: queryGeneration, appliedQuery: this.appliedQuery, error: null } };
+      this.state = retained.length
         ? { ...envelope, kind: 'refreshError', busy: false, message: WEBVIEW_STATE_MESSAGES.refreshError }
         : { ...envelope, kind: 'initialError', busy: false, message: WEBVIEW_STATE_MESSAGES.initialError };
       this.dependencies.output.appendLine('[index] presentation-unavailable');
       await this.publishState();
     }
+  }
+
+  private indexedState(snapshot: HubIndexSnapshot, folders: readonly HubFolderDto[]): WebviewState {
+    const envelope = { version: this.state.version, revision: this.state.revision + 1, folders,
+      search: { generation: this.queryGeneration, appliedQuery: this.appliedQuery, error: null } };
+    if (snapshot.health === 'stale' || snapshot.health === 'unavailable') return folders.length
+      ? { ...envelope, kind: 'refreshError', busy: false, message: WEBVIEW_STATE_MESSAGES.refreshError }
+      : { ...envelope, kind: 'initialError', busy: false, message: WEBVIEW_STATE_MESSAGES.initialError };
+    if (!snapshot.complete) return folders.length
+      ? { ...envelope, kind: 'refreshing', busy: true, message: WEBVIEW_STATE_MESSAGES.refreshing }
+      : { ...envelope, kind: 'loading', busy: true, message: WEBVIEW_STATE_MESSAGES.loading };
+    return { ...envelope, kind: 'ready', busy: false, message: folders.length ? null
+      : this.appliedQuery ? WEBVIEW_STATE_MESSAGES.noResults : WEBVIEW_STATE_MESSAGES.empty };
   }
 
   public dispose(): void {
@@ -144,6 +175,9 @@ implements vscode.WebviewViewProvider, vscode.Disposable, FolderCommandResolver 
     this.rejectBrowserReadyWaiters(this.viewGeneration, 'Webview Kilo Hub заменён до готовности.');
     this.disposeViewSubscriptions();
     const generation = ++this.viewGeneration;
+    this.appliedQuery = '';
+    this.queryGeneration = 0;
+    this.presentationGeneration += 1;
     this.view = view;
     this.browserReady = false;
     view.title = 'Kilo Hub';
@@ -169,6 +203,10 @@ implements vscode.WebviewViewProvider, vscode.Disposable, FolderCommandResolver 
         }
       }),
     ];
+    if (this.indexSnapshot) {
+      this.state = createInitialWebviewState(this.state.revision + 1);
+      void this.acceptIndexSnapshot(this.indexSnapshot);
+    }
   }
 
   public async refresh(): Promise<void> {
@@ -224,6 +262,7 @@ implements vscode.WebviewViewProvider, vscode.Disposable, FolderCommandResolver 
     if (this.disposed) {
       return;
     }
+    this.unfiltered = undefined;
     if (this.indexSnapshot) return this.acceptIndexSnapshot(this.indexSnapshot);
     if (this.state.kind === 'initial' || this.state.kind === 'initialError') {
       return;
@@ -317,6 +356,13 @@ implements vscode.WebviewViewProvider, vscode.Disposable, FolderCommandResolver 
   ): void {
     switch (message.type) {
       case 'ready':
+        if (this.browserReady && this.indexSnapshot) {
+          // A browser reload can repeat the handshake without replacing the VS Code view object.
+          this.appliedQuery = '';
+          this.queryGeneration = 0;
+          this.state = createInitialWebviewState(this.state.revision + 1);
+          void this.acceptIndexSnapshot(this.indexSnapshot);
+        }
         this.browserReady = true;
         this.resolveBrowserReadyWaiters(generation);
         void this.publishState();
@@ -326,6 +372,33 @@ implements vscode.WebviewViewProvider, vscode.Disposable, FolderCommandResolver 
         break;
       case 'refresh':
         void this.refresh().catch(() => undefined);
+        break;
+      case 'applySearch': {
+        if (!this.browserReady || message.generation <= this.queryGeneration) break;
+        const query = parseSearchQuery(message.query);
+        if (query.kind === 'invalid') {
+          this.state = { ...this.state, revision: this.state.revision + 1,
+            search: { generation: this.queryGeneration, appliedQuery: this.appliedQuery, error: query.reason } };
+          void this.publishState();
+          break;
+        }
+        this.appliedQuery = query.kind === 'reset' ? '' : message.query;
+        this.queryGeneration = message.generation;
+        if (query.kind === 'reset' && this.unfiltered && this.unfiltered.snapshot === this.indexSnapshot) {
+          this.presentationGeneration += 1;
+          this.folders = this.unfiltered.snapshot.folders;
+          this.state = this.indexedState(this.unfiltered.snapshot, this.unfiltered.folders);
+          void this.publishState();
+        } else if (this.indexSnapshot) void this.acceptIndexSnapshot(this.indexSnapshot);
+        break;
+      }
+      case 'pickFolder':
+        if (this.browserReady && !this.pickerInFlight && this.dependencies.pickFolder) {
+          this.pickerInFlight = true;
+          void this.dependencies.pickFolder().catch(() => {
+            this.dependencies.output.appendLine('[commands] folder-picker-unavailable');
+          }).finally(() => { this.pickerInFlight = false; });
+        }
         break;
       case 'folderAction':
         void this.handleFolderAction(message, view, generation);

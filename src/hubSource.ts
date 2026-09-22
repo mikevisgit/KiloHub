@@ -9,6 +9,7 @@ import { setImmediate as yieldTurn } from 'node:timers/promises';
 import { assertCompatibleSchema, assertSupportedKiloVersion } from './kiloDataSource.js';
 import { fileIdentity, HubFailure } from './hubStorage.js';
 import type { HubIndexOptions } from './hubIndexProtocol.js';
+import { normalizeSearchText } from './searchQuery.js';
 
 export function admitField(bytes: unknown, available?: number): void {
   const heap = getHeapStatistics();
@@ -19,7 +20,7 @@ export function admitField(bytes: unknown, available?: number): void {
 }
 
 export function normalizeIndexText(text: string): string {
-  return text.normalize('NFC').toLowerCase().replace(/ё/g, 'е').normalize('NFC');
+  return normalizeSearchText(text);
 }
 
 export interface SourceSession {
@@ -84,12 +85,22 @@ export class HubSource {
   }
 
   public assertIdentity(): void {
-    if (this.identity !== `${realpathSync.native(this.options.sourcePath).toLowerCase()}:${fileIdentity(this.options.sourcePath)}`) {
-      throw new HubFailure('source-unavailable');
-    }
+    try {
+      if (this.identity !== `${realpathSync.native(this.options.sourcePath).toLowerCase()}:${fileIdentity(this.options.sourcePath)}`) {
+        throw new HubFailure('source-unavailable');
+      }
+    } catch { throw new HubFailure('source-unavailable'); }
   }
 
   public async *sessions(after = ''): AsyncGenerator<SourceSession> {
+    try {
+      yield* this.readSessions(after);
+    } catch (error) {
+      throw error instanceof HubFailure ? error : new HubFailure('source-unavailable');
+    }
+  }
+
+  private async *readSessions(after: string): AsyncGenerator<SourceSession> {
     let cursor = after;
     while (true) {
       const rows = this.database.prepare(`SELECT id,octet_length(title) AS title_bytes,
@@ -126,6 +137,14 @@ export class HubSource {
   }
 
   public async *texts(session: string): AsyncGenerator<{ id: string; messageId: string; text: string }> {
+    try {
+      yield* this.readTexts(session);
+    } catch (error) {
+      throw error instanceof HubFailure ? error : new HubFailure('source-unavailable');
+    }
+  }
+
+  private async *readTexts(session: string): AsyncGenerator<{ id: string; messageId: string; text: string }> {
     // Both JSON columns are admitted before even json_valid/type/role touches either value.
     let messageCursor = '';
     while (true) {

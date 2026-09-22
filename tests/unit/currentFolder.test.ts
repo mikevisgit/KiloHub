@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   resolveCurrentFolder,
+  resolveTemporaryCurrentFolder,
   type CurrentFolderDiagnostic,
   type WorkspaceDescriptor,
 } from '../../src/currentFolder.js';
@@ -30,6 +31,16 @@ function folder(id = 'c:\\work\\project'): KiloFolder {
     conversations: [],
   };
 }
+
+void test('temporary current requires confirmed membership and an available supported workspace', () => {
+  assert.equal(resolveTemporaryCurrentFolder(descriptor(), [], false), null);
+  assert.equal(resolveTemporaryCurrentFolder(descriptor(), [folder()], true), null);
+  assert.equal(resolveTemporaryCurrentFolder(descriptor(), [], true)?.key, 'c:\\work\\project');
+  for (const overrides of [{ path: null }, { folderCount: 2 }, { remote: true },
+    { workspaceFile: 'C:\\test.code-workspace' }, { path: '\\\\server\\share' }, { scheme: 'vscode-remote' }]) {
+    assert.equal(resolveTemporaryCurrentFolder(descriptor(overrides), [], true), null);
+  }
+});
 
 void test('resolves one exact normalized local folder ID', () => {
   assert.deepEqual(resolveCurrentFolder(

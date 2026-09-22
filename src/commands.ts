@@ -6,6 +6,7 @@ import { KILO_HUB_COMMANDS } from './commandIds.js';
 import { sanitizeDiagnostic } from './diagnostics.js';
 import type { KiloFolder } from './types.js';
 import { resolveAvailableLocalDirectory } from './windowsPathSafety.js';
+import { normalizeWindowsDirectory } from './projection.js';
 
 export type FolderAction = 'openHere' | 'openNewWindow' | 'revealInExplorer';
 export type FinalFolderActionGuard = () => Promise<boolean>;
@@ -28,6 +29,48 @@ export function openFolderOptions(mode: 'here' | 'newWindow'):
   return mode === 'here'
     ? { forceReuseWindow: true }
     : { forceNewWindow: true };
+}
+
+export interface FolderPickerDependencies {
+  readonly select: () => Thenable<readonly vscode.Uri[] | undefined>;
+  readonly resolve: (path: string) => Promise<string | undefined>;
+  readonly currentPath: () => string | undefined;
+  readonly open: (uri: vscode.Uri) => Thenable<unknown>;
+  readonly error: () => Thenable<unknown>;
+}
+
+/** Paths originate exclusively in the native dialog, never in Webview messages. */
+export async function pickExistingFolder(dependencies: FolderPickerDependencies): Promise<void> {
+  try {
+    const selected = await dependencies.select();
+    if (selected === undefined || selected.length === 0) return;
+    const uri = selected.length === 1 ? selected[0] : undefined;
+    if (!uri || uri.scheme !== 'file' || uri.authority !== '' || !normalizeWindowsDirectory(uri.fsPath)) {
+      await dependencies.error();
+      return;
+    }
+    const path = await dependencies.resolve(uri.fsPath);
+    const normalized = path === undefined ? null : normalizeWindowsDirectory(path);
+    if (!normalized) { await dependencies.error(); return; }
+    const current = dependencies.currentPath();
+    if (current && normalizeWindowsDirectory(current)?.key === normalized.key) return;
+    await dependencies.open(vscode.Uri.file(normalized.path));
+  } catch {
+    await dependencies.error();
+  }
+}
+
+export async function showFolderPicker(): Promise<void> {
+  await pickExistingFolder({
+    select: () => vscode.window.showOpenDialog({ canSelectFiles: false, canSelectFolders: true,
+      canSelectMany: false, openLabel: 'Начать работу в новой папке' }),
+    resolve: (path) => resolveAvailableLocalDirectory(path, 2_000),
+    currentPath: () => !vscode.env.remoteName && !vscode.workspace.workspaceFile
+      && vscode.workspace.workspaceFolders?.length === 1
+      ? vscode.workspace.workspaceFolders[0].uri.fsPath : undefined,
+    open: (uri) => vscode.commands.executeCommand('vscode.openFolder', uri, openFolderOptions('here')),
+    error: () => vscode.window.showErrorMessage('Не удалось открыть папку: выберите доступную локальную папку Windows.'),
+  });
 }
 
 function redactPath(value: string, ...paths: readonly string[]): string {

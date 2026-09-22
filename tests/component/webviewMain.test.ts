@@ -141,6 +141,154 @@ function waitFor(window: HappyWindow, predicate: () => boolean): Promise<void> {
   });
 }
 
+void test('search separates draft and applied, validates NFC/code points, handles IME and reset races', async () => {
+  const harness = await setup();
+  try {
+    const input = harness.document.querySelector<HTMLInputElement>('.search-input');
+    assert.ok(input);
+    const key = (value: string, isComposing = false): void => {
+      input.dispatchEvent(new harness.window.KeyboardEvent('keydown', { key: value, bubbles: true, isComposing }) as unknown as Event);
+    };
+    harness.send(ready(1, [folder()]));
+    input.focus(); input.value = 'alpha';
+    input.dispatchEvent(new harness.window.Event('input') as unknown as Event);
+    assert.equal(harness.api.messages.length, 1);
+    key('Enter', true); assert.equal(harness.api.messages.length, 1);
+    input.dispatchEvent(new harness.window.CompositionEvent('compositionstart') as unknown as Event);
+    key('Enter'); assert.equal(harness.api.messages.length, 1);
+    input.dispatchEvent(new harness.window.CompositionEvent('compositionend') as unknown as Event);
+    key('Enter');
+    assert.deepEqual(harness.api.messages.at(-1), { type: 'applySearch', version: PROTOCOL_VERSION, query: 'alpha', generation: 1 });
+    harness.send({ ...ready(2, [folder()]), search: { generation: 1, appliedQuery: 'alpha', error: null } });
+    for (const value of ['ab', 'alpha по', 'e\u0301x', '😀a']) {
+      input.value = value; key('Enter');
+      assert.equal(harness.api.messages.length, 2);
+      assert.equal(harness.document.querySelector('.search-error')?.textContent, WEBVIEW_STATE_MESSAGES.shortQuery);
+    }
+    input.value = 'draft'; input.setSelectionRange(2, 3);
+    harness.send({ ...ready(3, [folder()]), search: { generation: 1, appliedQuery: 'alpha', error: null } });
+    assert.equal(input.value, 'draft'); assert.equal(input.selectionStart, 2); assert.equal(input.selectionEnd, 3);
+    assert.equal(harness.document.activeElement, input);
+    key('Escape');
+    assert.equal(input.value, '');
+    assert.deepEqual(harness.api.messages.at(-1), { type: 'applySearch', version: PROTOCOL_VERSION, query: '', generation: 2 });
+    harness.send({ ...ready(4, []), message: WEBVIEW_STATE_MESSAGES.noResults,
+      search: { generation: 1, appliedQuery: 'alpha', error: null } });
+    assert.equal(harness.document.querySelectorAll('.folder').length, 1);
+    harness.send({ ...ready(5, [folder()]), search: { generation: 2, appliedQuery: '', error: null } });
+    input.value = '😀ab'; key('Enter');
+    assert.equal(harness.api.messages.at(-1)?.type, 'applySearch');
+    input.value = '   '; key('Enter'); assert.equal(input.value, '');
+    (harness.document.querySelector('.search-clear') as HTMLButtonElement).click();
+    assert.equal(harness.document.activeElement, input);
+    await Promise.resolve();
+    assert.doesNotMatch(JSON.stringify(harness.api.state ?? {}), /draft|alpha|appliedQuery|queryGeneration/u);
+    assert.equal(harness.document.querySelectorAll('[title]').length, 0);
+    (harness.document.querySelector('.plus') as HTMLButtonElement).click();
+    assert.deepEqual(harness.api.messages.at(-1), { type: 'pickFolder', version: PROTOCOL_VERSION });
+  } finally { harness.dispose(); }
+});
+
+void test('temporary current has explanation only and becomes history without losing focus or expansion', async () => {
+  const harness = await setup({ beforeStart: (window) => window.document.body.classList.add('vscode-reduce-motion') });
+  try {
+    const temporary = folder({ current: true, temporary: true, conversations: [] });
+    const { activity: _activity, ...withoutDate } = temporary;
+    void _activity;
+    harness.send(ready(1, [withoutDate]));
+    const card = folderElement(harness.document, temporary.id);
+    const header = card.querySelector<HTMLButtonElement>('.folder-head'); assert.ok(header);
+    header.click(); header.focus(); await Promise.resolve();
+    assert.equal(card.querySelector('.history, .actions, .action'), null);
+    assert.equal(card.querySelector<HTMLElement>('.activity')?.hidden, true);
+    assert.equal(card.querySelector('.temporary-label')?.textContent, 'Пока без диалогов Kilo');
+    assert.equal(card.querySelector('.detail')?.textContent,
+      'Эта папка появится в истории после начала общения с Kilo. Информация о диалогах появится здесь автоматически.');
+    harness.send(ready(2, [folder({ current: true })]));
+    await Promise.resolve();
+    assert.equal(folderElement(harness.document, temporary.id), card);
+    assert.equal(harness.document.activeElement, header);
+    assert.equal(header.getAttribute('aria-expanded'), 'true');
+    assert.equal(card.querySelector('.temporary-explanation'), null);
+    assert.ok(card.querySelector('.history'));
+    assert.equal(card.querySelectorAll('.action').length, 1);
+  } finally { harness.dispose(); }
+});
+
+void test('partial empty and complete search empty differ while search and plus remain usable', async () => {
+  const harness = await setup();
+  try {
+    harness.send({ version: PROTOCOL_VERSION, revision: 1, kind: 'loading', folders: [], busy: true,
+      message: WEBVIEW_STATE_MESSAGES.loading, search: { generation: 0, appliedQuery: 'alpha', error: null } });
+    assert.equal(harness.document.querySelector<HTMLElement>('.reset-search')?.hidden, true);
+    assert.equal(harness.document.querySelector<HTMLInputElement>('.search-input')?.disabled, false);
+    assert.equal(harness.document.querySelector<HTMLButtonElement>('.plus')?.disabled, false);
+    harness.send({ ...ready(2, []), message: WEBVIEW_STATE_MESSAGES.noResults,
+      search: { generation: 0, appliedQuery: 'alpha', error: null } });
+    assert.equal(harness.document.querySelector<HTMLElement>('.reset-search')?.hidden, false);
+    assert.equal(harness.document.querySelector('.view-status')?.textContent, 'Папки не найдены');
+  } finally { harness.dispose(); }
+});
+
+void test('completed folders stay searchable during preparation without resetting the applied query', async () => {
+  const harness = await setup();
+  try {
+    const input = harness.document.querySelector<HTMLInputElement>('.search-input');
+    assert.ok(input);
+    harness.send({ ...ready(1, [folder()]), kind: 'refreshing', busy: true,
+      message: WEBVIEW_STATE_MESSAGES.refreshing,
+      search: { generation: 0, appliedQuery: '', error: null } });
+    await Promise.resolve();
+    assert.equal(harness.document.querySelectorAll('.folder').length, 1);
+    assert.equal(input.disabled, false);
+    input.value = 'alpha';
+    input.dispatchEvent(new harness.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }) as unknown as Event);
+    assert.deepEqual(harness.api.messages.at(-1), {
+      type: 'applySearch', version: PROTOCOL_VERSION, query: 'alpha', generation: 1,
+    });
+    harness.send({ ...ready(2, [folder()]), kind: 'refreshing', busy: true,
+      message: WEBVIEW_STATE_MESSAGES.refreshing,
+      search: { generation: 1, appliedQuery: 'alpha', error: null } });
+    await Promise.resolve();
+    assert.equal(harness.document.querySelectorAll('.folder').length, 1);
+    assert.equal(harness.document.querySelector('.view-status')?.textContent, WEBVIEW_STATE_MESSAGES.refreshing);
+    harness.send({ ...ready(3, [folder()]), search: { generation: 1, appliedQuery: 'alpha', error: null } });
+    await Promise.resolve();
+    assert.equal(input.value, 'alpha');
+    assert.equal(harness.api.messages.filter((message) => message.type === 'applySearch').length, 1);
+  } finally { harness.dispose(); }
+});
+
+void test('only info plus and name-path own tooltips and input Escape always clears search', async () => {
+  const harness = await setup();
+  try {
+    harness.send(ready(1, [folder()]));
+    assert.equal(harness.document.querySelectorAll('[role="tooltip"]').length, 3);
+    for (const selector of ['.info', '.plus']) {
+      const owner = harness.document.querySelector<HTMLElement>(selector); assert.ok(owner);
+      const tooltip = harness.document.getElementById(owner.getAttribute('aria-describedby') ?? ''); assert.ok(tooltip);
+      owner.focus(); assert.equal(tooltip.hidden, false);
+      owner.dispatchEvent(new harness.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }) as unknown as Event);
+      assert.equal(tooltip.hidden, true);
+      owner.dispatchEvent(new harness.window.FocusEvent('focusin', { bubbles: true }) as unknown as Event);
+      assert.equal(tooltip.hidden, true);
+      owner.blur();
+    }
+    const header = harness.document.querySelector<HTMLElement>('.folder-head'); assert.ok(header);
+    const path = harness.document.getElementById(header.getAttribute('aria-describedby') ?? ''); assert.ok(path);
+    header.focus(); assert.equal(path.hidden, true);
+    const name = harness.document.querySelector<HTMLElement>('.folder-name'); assert.ok(name);
+    name.dispatchEvent(new harness.window.PointerEvent('pointerover', { bubbles: true }) as unknown as Event);
+    assert.equal(path.hidden, false);
+    const input = harness.document.querySelector<HTMLInputElement>('.search-input'); assert.ok(input);
+    input.focus(); input.value = 'draft';
+    input.dispatchEvent(new harness.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }) as unknown as Event);
+    assert.equal(input.value, ''); assert.equal(path.hidden, true);
+    assert.equal(harness.document.querySelectorAll('[title]').length, 0);
+    assert.equal(harness.document.querySelector('.search-clear')?.hasAttribute('aria-describedby'), false);
+  } finally { harness.dispose(); }
+});
+
 void test('persists only opaque UI state and restores it after the host republishes data', async () => {
   const first = await setup({
     beforeStart: (window) => window.document.body.classList.add('vscode-reduce-motion'),
@@ -485,7 +633,7 @@ void test('browser date labels cover canonical boundaries, plural forms, leap da
   );
 });
 
-void test('restores removed action focus to its folder, then nearest folder and info', async () => {
+void test('restores removed action focus to its folder, then nearest folder and search', async () => {
   const first = folder({ id: 'first', name: 'First', path: 'C:\\First' });
   const second = folder({ id: 'second', name: 'Second', path: 'C:\\Second' });
   const third = folder({ id: 'third', name: 'Third', path: 'C:\\Third' });
@@ -500,7 +648,7 @@ void test('restores removed action focus to its folder, then nearest folder and 
     assert.ok(firstAction);
     firstAction.focus();
     harness.send(ready(2, [{ ...first, current: true }, second, third]));
-    assert.equal(harness.document.activeElement, firstElement.querySelector('.folder-head'));
+    assert.ok(harness.document.activeElement === firstElement.querySelector('.folder-head'), 'removed action focuses own header');
 
     const secondElement = folderElement(harness.document, 'second');
     (secondElement.querySelector('.folder-head') as HTMLButtonElement).click();
@@ -508,14 +656,12 @@ void test('restores removed action focus to its folder, then nearest folder and 
     assert.ok(secondAction);
     secondAction.focus();
     harness.send(ready(3, [{ ...first, current: true }, third]));
-    assert.equal(
-      harness.document.activeElement,
-      folderElement(harness.document, 'third').querySelector('.folder-head'),
-    );
+    assert.ok(harness.document.activeElement === folderElement(harness.document, 'third').querySelector('.folder-head'),
+      'removed card focuses nearest visible header');
 
     (folderElement(harness.document, 'third').querySelector('.folder-head') as HTMLButtonElement).focus();
     harness.send(ready(4, []));
-    assert.equal(harness.document.activeElement, harness.document.querySelector('.info'));
+    assert.ok(harness.document.activeElement === harness.document.querySelector('.search-input'), 'empty list focuses search');
   } finally {
     harness.dispose();
   }
@@ -617,9 +763,9 @@ void test('recomputes nonce stylesheet badge variables on theme mutation without
     assert.equal(refresh, null);
     assert.ok(name);
     assert.ok(header);
-    assert.equal(info.hasAttribute('aria-describedby'), false);
+    assert.equal(info.hasAttribute('aria-describedby'), true);
     assert.equal(harness.document.querySelector('.action')?.hasAttribute('aria-describedby'), false);
-    assert.equal(harness.document.querySelectorAll('[role="tooltip"]').length, 1);
+    assert.equal(harness.document.querySelectorAll('[role="tooltip"]').length, 3);
     const tooltipId = header.getAttribute('aria-describedby');
     assert.ok(tooltipId);
     const tooltip = harness.document.getElementById(tooltipId);

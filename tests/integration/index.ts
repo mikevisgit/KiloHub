@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdtempSync,
@@ -7,19 +8,20 @@ import {
   readdirSync,
   rmSync,
   statSync,
+  realpathSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname, basename, relative, isAbsolute } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { pathToFileURL } from 'node:url';
 
 import * as vscode from 'vscode';
 
-import { openFolderOptions } from '../../src/commands.js';
+import { openFolderOptions, pickExistingFolder } from '../../src/commands.js';
 import type { FolderAction } from '../../src/commands.js';
 import { KiloHubWebviewProvider } from '../../src/kiloHubWebviewProvider.js';
 import { HubIndexService } from '../../src/hubIndexService.js';
-import type { HubIndexSnapshot } from '../../src/hubIndexProtocol.js';
+import type { HubIndexSnapshot, HubSearchResult } from '../../src/hubIndexProtocol.js';
 import type { KiloFolder } from '../../src/types.js';
 import { PROTOCOL_VERSION } from '../../src/webviewProtocol.js';
 
@@ -380,7 +382,9 @@ async function testBackgroundSnapshotsWithoutWebview(repositoryRoot: string): Pr
     loadFolders: () => { reads += 1; return Promise.resolve([]); },
     workspaceDescriptor: () => { const next = pending; pending = undefined; return next?.promise ?? Promise.resolve(workspace); },
     index: { subscribe: (next) => { listener = next; next(snapshot); return { dispose: () => { listener = undefined; } }; },
-      poll: () => { polls += 1; } },
+      poll: () => { polls += 1; },
+      search: (_query, queryGeneration) => Promise.resolve({ generation: snapshot.generation,
+        indexRevision: snapshot.indexRevision, queryGeneration, matches: [] }) },
     executeAction: () => Promise.resolve(),
     revealView: () => Promise.resolve(),
     browserReadyTimeoutMs: 20,
@@ -409,6 +413,107 @@ async function testBackgroundSnapshotsWithoutWebview(repositoryRoot: string): Pr
   }
 }
 
+async function testSearchAndPicker(repositoryRoot: string): Promise<void> {
+  const receive = new vscode.EventEmitter<unknown>();
+  const dispose = new vscode.EventEmitter<void>();
+  const first: KiloFolder = { id: 'c:\\site', name: 'Site', path: 'C:\\Site', uri: 'file:///C:/Site',
+    available: true, conversations: [{ id: 'latest', title: 'Latest title' }] };
+  const other: KiloFolder = { ...first, id: 'c:\\other', name: 'Other', path: 'C:\\Other' };
+  let snapshot: HubIndexSnapshot = { generation: 'synthetic', indexRevision: 1,
+    health: 'ready', complete: true, folders: [first, other] };
+  let listener: ((snapshot: HubIndexSnapshot) => void) | undefined;
+  const searches: { query: string; generation: number; pending: Deferred<HubSearchResult> }[] = [];
+  let workspacePath = 'C:\\Fresh';
+  let pickerCalls = 0;
+  const provider = new KiloHubWebviewProvider({ extensionUri: vscode.Uri.file(repositoryRoot),
+    output: { appendLine: () => undefined } as unknown as vscode.OutputChannel,
+    loadFolders: () => Promise.resolve([]), executeAction: () => Promise.resolve(),
+    pickFolder: () => { pickerCalls += 1; return Promise.resolve(); },
+    workspaceDescriptor: () => Promise.resolve({ folderCount: 1, path: workspacePath,
+      scheme: 'file', authority: '', workspaceFile: null, remote: false }),
+    index: { subscribe: (next) => { listener = next; next(snapshot); return { dispose: () => undefined }; },
+      poll: () => undefined, search: (query, generation) => {
+        const pending = deferred<HubSearchResult>(); searches.push({ query, generation, pending }); return pending.promise;
+      } },
+  });
+  const view = { webview: { options: {}, html: '', cspSource: 'vscode-webview:',
+    asWebviewUri: (uri: vscode.Uri) => uri, onDidReceiveMessage: receive.event,
+    postMessage: () => Promise.resolve(true) }, onDidDispose: dispose.event } as unknown as vscode.WebviewView;
+  const send = (query: string, generation: number): void => receive.fire({ type: 'applySearch', version: PROTOCOL_VERSION, query, generation });
+  const complete = (index: number, ids: readonly string[], revision = 1): void => searches[index].pending.resolve({
+    generation: 'synthetic', indexRevision: revision, queryGeneration: searches[index].generation,
+    matches: ids.map((folderId) => ({ folderId, rank: 0 as const })),
+  });
+  try {
+    provider.resolveWebviewView(view);
+    receive.fire({ type: 'ready', version: PROTOCOL_VERSION });
+    await waitUntil(() => provider.currentState.kind === 'ready');
+    assert.equal(provider.currentState.folders[0].temporary, true);
+    assert.equal(provider.currentState.folders[0].id, 'c:\\fresh');
+    receive.fire({ type: 'pickFolder', version: PROTOCOL_VERSION, path: 'C:\\hostile' });
+    assert.equal(pickerCalls, 0);
+    receive.fire({ type: 'pickFolder', version: PROTOCOL_VERSION });
+    await waitUntil(() => pickerCalls === 1);
+    send('sit', 1); await waitUntil(() => searches.length === 1);
+    complete(0, [first.id]); await waitUntil(() => provider.currentState.search?.generation === 1);
+    assert.deepEqual(provider.currentState.folders.map(({ id }) => id), [first.id]);
+    for (const query of ['ab', 'site по', 'e\u0301x', '😀a']) {
+      send(query, 2);
+      assert.equal(searches.length, 1);
+      assert.equal(provider.currentState.search?.appliedQuery, 'sit');
+      assert.deepEqual(provider.currentState.folders.map(({ id }) => id), [first.id]);
+    }
+    snapshot = { ...snapshot, indexRevision: 2 };
+    listener?.(snapshot); await waitUntil(() => searches.length === 2);
+    assert.equal(searches[1].query, 'sit');
+    send('oth', 2); await waitUntil(() => searches.length === 3);
+    complete(2, [other.id], 2); await waitUntil(() => provider.currentState.search?.generation === 2);
+    complete(1, [first.id], 2); await new Promise((done) => setTimeout(done, 10));
+    assert.deepEqual(provider.currentState.folders.map(({ id }) => id), [other.id]);
+    send('sit', 3); await waitUntil(() => searches.length === 4);
+    send('', 4); await waitUntil(() => provider.currentState.search?.generation === 4);
+    assert.equal(provider.currentState.folders.length, 3);
+    complete(3, [first.id], 2); await new Promise((done) => setTimeout(done, 10));
+    assert.equal(provider.currentState.folders.length, 3);
+    listener?.({ ...snapshot, complete: false, health: 'stale' });
+    await waitUntil(() => provider.currentState.kind === 'refreshError');
+    assert.equal(provider.currentState.folders.some(({ temporary }) => temporary), false);
+    await provider.workspaceChanged();
+    assert.equal(provider.currentState.kind, 'refreshError');
+    workspacePath = 'C:\\Other';
+    listener?.(snapshot); await waitUntil(() => provider.currentState.kind === 'ready');
+    assert.equal(provider.currentState.folders[0].id, other.id);
+    send('sit', 5); await waitUntil(() => searches.length === 5);
+    provider.resolveWebviewView(view);
+    receive.fire({ type: 'ready', version: PROTOCOL_VERSION });
+    await waitUntil(() => provider.currentState.kind === 'ready');
+    complete(4, [first.id], 2); await new Promise((done) => setTimeout(done, 10));
+    assert.equal(provider.currentState.search?.appliedQuery, '');
+    assert.equal(provider.currentState.folders.length, 2);
+    send('oth', 1); await waitUntil(() => searches.length === 6);
+    receive.fire({ type: 'ready', version: PROTOCOL_VERSION });
+    await waitUntil(() => provider.currentState.kind === 'ready' && provider.currentState.search?.generation === 0);
+    complete(5, [other.id], 2); await new Promise((done) => setTimeout(done, 10));
+    assert.equal(provider.currentState.search?.appliedQuery, '');
+  } finally { provider.dispose(); receive.dispose(); dispose.dispose(); }
+
+  let selected: readonly vscode.Uri[] | undefined;
+  let available: string | undefined = 'C:\\Fresh';
+  let current: string | undefined;
+  const opened: vscode.Uri[] = [];
+  let errors = 0;
+  const pick = (): Promise<void> => pickExistingFolder({ select: () => Promise.resolve(selected),
+    resolve: () => Promise.resolve(available), currentPath: () => current,
+    open: (uri) => { opened.push(uri); return Promise.resolve(); },
+    error: () => { errors += 1; return Promise.resolve(); } });
+  await pick(); assert.equal(opened.length, 0); assert.equal(errors, 0);
+  selected = [vscode.Uri.parse('vscode-remote://host/folder')]; await pick(); assert.equal(errors, 1);
+  selected = [vscode.Uri.file('\\\\server\\share')]; await pick(); assert.equal(errors, 2);
+  selected = [vscode.Uri.file('C:\\Fresh')]; available = undefined; await pick(); assert.equal(errors, 3);
+  available = 'C:\\Fresh'; current = 'c:\\fresh'; await pick(); assert.equal(opened.length, 0);
+  current = undefined; await pick(); assert.equal(opened[0].fsPath.toLowerCase(), 'c:\\fresh');
+}
+
 export async function run(): Promise<void> {
   const expectedNode = process.env.KILO_HUB_EXPECTED_NODE;
   const expectedElectron = process.env.KILO_HUB_EXPECTED_ELECTRON;
@@ -432,12 +537,37 @@ export async function run(): Promise<void> {
   assert.equal(existsSync(join(repositoryRoot, 'build', 'webview', 'webview.css')), true);
   await testBackgroundSnapshotsWithoutWebview(repositoryRoot);
   await testHostProviderContract(repositoryRoot);
+  await testSearchAndPicker(repositoryRoot);
 
+  const suppliedPath = process.env.KILO_HUB_SYNTHETIC_TEST === '1' ? process.env.KILO_DB : undefined;
+  const installedMode = process.env.KILO_HUB_NO_EXTERNAL_TOOLS === '1';
+  if (installedMode) {
+    assert.ok(suppliedPath, 'Installed startup must supply the isolated sentinel before activation.');
+    const systemRoot = process.env.SystemRoot;
+    assert.ok(systemRoot);
+    const where = join(systemRoot, 'System32', 'where.exe');
+    for (const tool of ['node', 'npm', 'sqlite3', 'kilo']) {
+      for (const name of [tool, `${tool}.exe`, `${tool}.cmd`, `${tool}.bat`]) {
+        const probe = spawnSync(where, [name], { encoding: 'utf8', windowsHide: true });
+        assert.equal(probe.status, 1, `External tool must not resolve: ${name}`);
+        assert.equal(probe.stdout.trim(), '');
+      }
+    }
+  }
+  if (suppliedPath !== undefined) {
+    const isolatedRoot = realpathSync(join(repositoryRoot, 'build', 'installed-smoke'));
+    const parent = realpathSync(dirname(suppliedPath));
+    const inside = relative(isolatedRoot, parent);
+    assert.ok(inside !== '' && !inside.startsWith('..') && !isAbsolute(inside));
+    assert.equal(basename(suppliedPath), 'synthetic-source-not-created.sqlite');
+    assert.equal(existsSync(suppliedPath), false, 'Never overwrite an existing source.');
+  }
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'kilo-hub-extension-'));
-  const databasePath = join(fixtureRoot, 'kilo.db');
+  const databasePath = suppliedPath ?? join(fixtureRoot, 'kilo.db');
   const workspacePath = resolve(repositoryRoot, 'tests', 'fixtures', 'workspace');
   createFixture(databasePath, workspacePath);
-  const before = fingerprintDirectory(fixtureRoot);
+  const sourceDirectory = dirname(databasePath);
+  const before = fingerprintDirectory(sourceDirectory);
   process.env.KILO_DB = databasePath;
   process.env.KILO_HUB_SYNTHETIC_TEST = '1';
 
@@ -446,7 +576,7 @@ export async function run(): Promise<void> {
     assert.ok(extension);
     assertManifest(extension.packageJSON);
     const manifest = extension.packageJSON;
-    assert.equal(manifest.version, '0.2.3');
+    assert.equal(manifest.version, '0.3.0');
     assert.equal(manifest.icon, 'resources/kilo-hub.png');
     assert.deepEqual(sorted(manifest.activationEvents), sorted(['onStartupFinished', 'onCommand:kiloHub.refresh', 'onView:kiloHub.folders']));
     assert.deepEqual(sorted(manifest.contributes.commands.map(({ command }) => command)), sorted(COMMAND_IDS));
@@ -470,7 +600,7 @@ export async function run(): Promise<void> {
     assert.equal(extension.isActive, true);
     const productCommands = (await vscode.commands.getCommands(true)).filter((id) => COMMAND_IDS.includes(id as typeof COMMAND_IDS[number]));
     assert.deepEqual(sorted(productCommands), sorted(COMMAND_IDS));
-    assert.deepEqual(fingerprintDirectory(fixtureRoot), before);
+    assert.deepEqual(fingerprintDirectory(sourceDirectory), before);
     assert.deepEqual(openFolderOptions('here'), { forceReuseWindow: true });
     assert.deepEqual(openFolderOptions('newWindow'), { forceNewWindow: true });
   } finally {
@@ -480,6 +610,9 @@ export async function run(): Promise<void> {
     delete process.env.KILO_HUB_SYNTHETIC_TEST;
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
     rmSync(fixtureRoot, { force: true, recursive: true });
+    if (suppliedPath) {
+      for (const suffix of ['', '-wal', '-shm']) rmSync(`${suppliedPath}${suffix}`, { force: true });
+    }
   }
 }
 

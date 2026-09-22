@@ -62,7 +62,7 @@ void test('durable generations preserve all history, resume committed session pr
     assert.equal(partial.complete, false);
     assert.equal(partial.health, 'preparing');
     const first = f.pointer();
-    assert.equal(first.published, null);
+    assert.equal(first.published, first.building);
     assert.ok(first.building);
     const stage = f.read(first.building);
     assert.equal(stage.prepare('SELECT count(*) n FROM sessions').get()?.n, 100);
@@ -100,7 +100,7 @@ void test('reconciliation catches edits without updated/sequence changes, deleti
     assert.ok(value instanceof Uint8Array);
     assert.equal(Buffer.from(value).toString(), 'edited\0tail'); db.close();
     f.source.exec("DELETE FROM part WHERE id='ps00000'; UPDATE session SET time_archived=3 WHERE id='s00001'");
-    assert.equal((await complete(engine)).complete, true);
+    assert.equal((await complete(engine, true)).complete, true);
     db = f.read(f.pointer().published!);
     assert.equal(db.prepare('SELECT count(*) n FROM sessions').get()?.n, 1);
     assert.equal(db.prepare('SELECT count(*) n FROM texts').get()?.n, 0); db.close();
@@ -164,9 +164,9 @@ void test('resource refusal precedes parsing of both JSON columns, preserves cur
     const refused = await complete(engine, true);
     assert.equal(refused.diagnostic, 'resource-refused');
     assert.equal(refused.generation, good.generation);
-    const generation = f.pointer().building!;
+    const generation = f.pointer().published!;
     let db = f.read(generation);
-    assert.equal(db.prepare('SELECT cursor FROM progress').get()?.cursor, ''); db.close();
+    assert.equal(db.prepare('SELECT id FROM work').get()?.id, 's00000'); db.close();
     budget = 1024 * 1024 * 1024;
     assert.equal((await complete(engine)).complete, true);
     assert.equal(f.pointer().published, generation);
@@ -310,7 +310,7 @@ void test('source replacement discards pending generation rather than mixing ide
   } finally { await replacement.close(); await f.close(); }
 });
 
-void test('display overflow refuses a complete visible result without truncating indexed title/history', async () => {
+void test('display overflow rolls back candidate metadata and does not expose staged text', async () => {
   const f = fixture();
   try {
     f.source.prepare('UPDATE session SET title=?').run('x'.repeat(5000));
@@ -319,8 +319,9 @@ void test('display overflow refuses a complete visible result without truncating
     assert.equal(snapshot.complete, false);
     assert.equal(f.pointer().published, null);
     const db = f.read(f.pointer().building!);
-    assert.equal(db.prepare('SELECT length(title) n FROM sessions').get()?.n, 5000);
-    assert.equal(db.prepare('SELECT count(*) n FROM texts').get()?.n, 1); db.close();
+    assert.equal(db.prepare('SELECT count(*) n FROM sessions').get()?.n, 0);
+    assert.equal(db.prepare('SELECT count(*) n FROM texts').get()?.n, 0);
+    assert.equal(db.prepare('SELECT count(*) n FROM staged_texts').get()?.n, 1); db.close();
   } finally { await f.close(); }
 });
 
@@ -380,9 +381,9 @@ void test('real SQLite disk-full rollback retains published data and retries the
     assert.equal(failed.complete, false);
     assert.equal(failed.generation, good.generation);
     assert.equal(failed.diagnostic, 'storage-unavailable');
-    const generation = f.pointer().building!;
+    const generation = f.pointer().published!;
     const staged = f.read(generation);
-    assert.equal(staged.prepare('SELECT cursor FROM progress').get()?.cursor, ''); staged.close();
+    assert.equal(staged.prepare('SELECT id FROM work').get()?.id, 's00000'); staged.close();
     HubStorage.prototype.open = open;
     const recovered = await complete(engine);
     assert.equal(recovered.complete, true);
@@ -484,6 +485,8 @@ void test('fault during initialization rolls back schema markers; invalid single
     const engine = f.engine();
     const good = await complete(engine);
     f.source.exec("UPDATE session SET title='Changed'");
+    const legacy = new DatabaseSync(join(f.options.storagePath, `hub-${f.pointer().published!}.sqlite`));
+    legacy.exec('PRAGMA user_version=2'); legacy.close();
     HubStorage.prototype.open = function (generation, writable, fresh = false) {
       const db = open.call(this, generation, writable, fresh);
       if (fresh) {
@@ -501,13 +504,12 @@ void test('fault during initialization rolls back schema markers; invalid single
     let db = f.read(interrupted);
     assert.equal(db.prepare('PRAGMA application_id').get()?.application_id, 0);
     assert.equal(db.prepare("SELECT name FROM sqlite_schema WHERE name='progress'").get(), undefined); db.close();
-    assert.equal((await engine.tick()).diagnostic, 'storage-unavailable');
-    assert.equal(f.pointer().published, good.generation.split(':')[1]);
     assert.equal((await engine.tick()).complete, false);
+    assert.equal(f.pointer().published, good.generation.split(':')[1]);
     const staged = f.pointer().building!;
     db = new DatabaseSync(join(f.options.storagePath, `hub-${staged}.sqlite`));
     db.exec('DELETE FROM progress'); db.close();
-    assert.equal((await engine.tick()).diagnostic, 'storage-unavailable');
+    assert.equal((await engine.tick()).complete, false);
     assert.equal((await complete(engine)).complete, true);
     assert.notEqual(f.pointer().published, staged);
   } finally { HubStorage.prototype.open = open; await f.close(); }

@@ -1,5 +1,5 @@
 import { normalizeWindowsDirectory } from './projection.js';
-import type { KiloFolder } from './types.js';
+import type { KiloFolder, NormalizedWindowsDirectory } from './types.js';
 
 export interface WorkspaceDescriptor {
   readonly folderCount: number;
@@ -53,4 +53,14 @@ export function resolveCurrentFolder(
   if (matches.length === 0) return unresolved('not-in-snapshot');
   if (matches.length !== 1) return unresolved('ambiguous-snapshot');
   return { folderId: normalized.key, diagnostic: 'resolved' };
+}
+
+/** Caller supplies an availability-checked workspace and successful source membership. */
+export function resolveTemporaryCurrentFolder(
+  workspace: WorkspaceDescriptor,
+  snapshot: readonly KiloFolder[],
+  membershipComplete: boolean,
+): NormalizedWindowsDirectory | null {
+  if (!membershipComplete || resolveCurrentFolder(workspace, snapshot).diagnostic !== 'not-in-snapshot') return null;
+  return workspace.path === null ? null : normalizeWindowsDirectory(workspace.path) ?? null;
 }

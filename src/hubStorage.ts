@@ -64,6 +64,7 @@ export class HubStorage {
   private server: Server | undefined;
   private storeIdentity = '';
   private readonly connections = new WeakMap<DatabaseSync, { path: string; identity: string }>();
+  private readonly integrity = new Map<string, string>();
   private readonly pointerPath: string;
   public constructor(public readonly directory: string, private readonly source: string) {
     this.pointerPath = join(directory, 'hub-pointer.json');
@@ -160,15 +161,32 @@ export class HubStorage {
           if (existsSync(path + suffix)) unlinkSync(path + suffix);
         }
         delete identities[generation];
+        this.invalidateIntegrity(generation);
       } catch { retired.push(generation); }
     }
     return { ...pointer, retired, identities };
   }
 
   public open(generation: string, writable: boolean, fresh = false): DatabaseSync {
+    try { return this.openChecked(generation, writable, fresh); }
+    catch (error) {
+      this.invalidateIntegrity(generation);
+      throw error;
+    }
+  }
+
+  /** Native read/write failures and publication require a new integrity check. */
+  public invalidateIntegrity(generation?: string): void {
+    if (generation === undefined) this.integrity.clear();
+    else this.integrity.delete(generation);
+  }
+
+  private openChecked(generation: string, writable: boolean, fresh: boolean): DatabaseSync {
     const path = this.path(generation);
     assertIsolated(this.source, path, !writable);
     if (writable) this.assertOwner();
+    const identity = fileIdentity(path);
+    if (fresh) this.invalidateIntegrity(generation);
     if (fresh && (statSync(path).size !== 0 || this.readPointer()?.identities[generation] !== fileIdentity(path))) {
       throw new HubFailure('storage-unsafe');
     }
@@ -177,15 +195,37 @@ export class HubStorage {
       if (!pointer || pointer.identities[generation] !== fileIdentity(path)) throw new HubFailure('storage-unsafe');
       const probe = new DatabaseSync(path, { readOnly: true, allowExtension: false, timeout: 80 });
       try {
-        if (probe.prepare('PRAGMA application_id').get()?.application_id !== HUB_APPLICATION_ID
-          || probe.prepare('PRAGMA user_version').get()?.user_version !== 1
-          || probe.prepare('PRAGMA quick_check').get()?.quick_check !== 'ok') {
+        probe.exec('BEGIN');
+        const application = probe.prepare('PRAGMA application_id').get()?.application_id;
+        const version = probe.prepare('PRAGMA user_version').get()?.user_version;
+        const schemaVersion = probe.prepare('PRAGMA schema_version').get()?.schema_version;
+        const integrityKey = `${identity}:${String(application)}:${String(version)}:${String(schemaVersion)}`;
+        if (application !== HUB_APPLICATION_ID || ![1, 2, 3].includes(Number(version))) {
           throw new HubFailure('storage-unavailable');
+        }
+        if (this.integrity.get(generation) !== integrityKey
+          && probe.prepare('PRAGMA quick_check').get()?.quick_check !== 'ok') {
+          throw new HubFailure('storage-unavailable');
+        }
+        if (version === 2 || version === 3) {
+          const schema = probe.prepare("SELECT sql FROM sqlite_schema WHERE name='search_fields'").get()?.sql;
+          if (typeof schema !== 'string' || !schema.includes("USING fts5(text,folder UNINDEXED,field_rank UNINDEXED,session_id UNINDEXED,has_nul UNINDEXED,tokenize='trigram')")) {
+            throw new HubFailure('storage-unavailable');
+          }
+          probe.prepare('SELECT text,folder,field_rank,session_id,has_nul FROM search_fields LIMIT 0');
+          probe.prepare('SELECT row_id,session_id,has_nul FROM search_rows LIMIT 0');
         }
         for (const [table, names] of Object.entries({
           progress: ['fingerprint', 'source_identity', 'cursor', 'complete', 'owner', 'revision'],
           sessions: ['id', 'title', 'title_fold', 'title_norm', 'directory', 'folder', 'created', 'updated', 'id_fold', 'sequence'],
           texts: ['id', 'session_id', 'message_id', 'text'],
+          ...(version === 3 ? {
+            versions: ['id', 'metadata', 'content'],
+            work: ['order_id', 'id', 'full'],
+            sync_state: ['last_full', 'full_scan'],
+            census: ['id', 'metadata'],
+            staged_texts: ['id', 'session_id', 'message_id', 'text'],
+          } : {}),
         })) {
           if (probe.prepare('SELECT type FROM sqlite_schema WHERE name=?').get(table)?.type !== 'table') {
             throw new HubFailure('storage-unavailable');
@@ -204,16 +244,33 @@ export class HubStorage {
           || typeof row.revision !== 'number' || !Number.isSafeInteger(row.revision) || row.revision < 1) {
           throw new HubFailure('storage-unavailable');
         }
+        if (version === 3) {
+          const states = probe.prepare('SELECT * FROM sync_state').all();
+          const state = states[0];
+          if (states.length !== 1 || !state || typeof state.last_full !== 'number'
+            || !Number.isSafeInteger(state.last_full) || state.last_full < 0
+            || (state.full_scan !== 0 && state.full_scan !== 1)) {
+            throw new HubFailure('storage-unavailable');
+          }
+        }
+        this.integrity.set(generation, integrityKey);
       } finally { probe.close(); }
     }
     assertIsolated(this.source, path, !writable);
     const database = new DatabaseSync(path, { readOnly: !writable, allowExtension: false, timeout: 80 });
-    if (writable) this.connections.set(database, { path, identity: fileIdentity(path) });
-    if (!writable) database.exec('PRAGMA query_only=ON');
-    return database;
+    try {
+      if (fileIdentity(path) !== identity) throw new HubFailure('storage-unsafe');
+      if (writable) this.connections.set(database, { path, identity });
+      if (!writable) database.exec('PRAGMA query_only=ON');
+      return database;
+    } catch (error) {
+      database.close();
+      throw error;
+    }
   }
 
   public async close(): Promise<void> {
+    this.invalidateIntegrity();
     const server = this.server;
     this.server = undefined;
     if (server?.listening) await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
