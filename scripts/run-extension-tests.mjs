@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mkdtemp, rm } from 'node:fs/promises';
 
 import { runTests } from '@vscode/test-electron';
 
@@ -16,7 +17,9 @@ const expectedRuntime = version === '1.105.1'
 try {
   delete process.env.ELECTRON_RUN_AS_NODE;
 const testHost = await prepareIsolatedTestHost(version);
+let fixtureRoot;
 try {
+  fixtureRoot = await mkdtemp(path.join(repositoryRoot, 'build', 'host-source-'));
   await runTests({
     vscodeExecutablePath: testHost.vscodeExecutablePath,
     extensionDevelopmentPath: repositoryRoot,
@@ -27,6 +30,9 @@ try {
     ],
     extensionTestsEnv: {
       ...process.env,
+      KILO_DB: path.join(fixtureRoot, 'synthetic-source-not-created.sqlite'),
+      KILO_HUB_SYNTHETIC_TEST: '1',
+      KILO_HUB_TEST_FIXTURE_ROOT: fixtureRoot,
       ...(expectedRuntime === undefined ? {} : {
         KILO_HUB_EXPECTED_NODE: expectedRuntime.node,
         KILO_HUB_EXPECTED_ELECTRON: expectedRuntime.electron,
@@ -35,7 +41,8 @@ try {
     reuseMachineInstall: false,
   });
 } finally {
-  await testHost.restore();
+  try { await testHost.restore(); }
+  finally { if (fixtureRoot) await rm(fixtureRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
 }
 } catch (error) {
   console.error('Extension Host tests failed.', error);

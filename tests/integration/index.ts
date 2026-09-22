@@ -3,17 +3,13 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import {
   existsSync,
-  mkdtempSync,
   readFileSync,
   readdirSync,
-  rmSync,
   statSync,
   realpathSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join, resolve, dirname, basename, relative, isAbsolute } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { pathToFileURL } from 'node:url';
 
 import * as vscode from 'vscode';
 
@@ -554,16 +550,19 @@ export async function run(): Promise<void> {
       }
     }
   }
-  if (suppliedPath !== undefined) {
-    const isolatedRoot = realpathSync(join(repositoryRoot, 'build', 'installed-smoke'));
+  const suppliedRoot = process.env.KILO_HUB_TEST_FIXTURE_ROOT;
+  assert.ok(suppliedPath && suppliedRoot, 'The runner must own the synthetic fixture before activation.');
+  {
+    const isolatedRoot = realpathSync(join(repositoryRoot, 'build'));
     const parent = realpathSync(dirname(suppliedPath));
     const inside = relative(isolatedRoot, parent);
     assert.ok(inside !== '' && !inside.startsWith('..') && !isAbsolute(inside));
+    assert.equal(parent, realpathSync(suppliedRoot));
     assert.equal(basename(suppliedPath), 'synthetic-source-not-created.sqlite');
     assert.equal(existsSync(suppliedPath), false, 'Never overwrite an existing source.');
   }
-  const fixtureRoot = mkdtempSync(join(tmpdir(), 'kilo-hub-extension-'));
-  const databasePath = suppliedPath ?? join(fixtureRoot, 'kilo.db');
+  const fixtureRoot = suppliedRoot;
+  const databasePath = suppliedPath;
   const workspacePath = resolve(repositoryRoot, 'tests', 'fixtures', 'workspace');
   createFixture(databasePath, workspacePath);
   const sourceDirectory = dirname(databasePath);
@@ -604,17 +603,8 @@ export async function run(): Promise<void> {
     assert.deepEqual(openFolderOptions('here'), { forceReuseWindow: true });
     assert.deepEqual(openFolderOptions('newWindow'), { forceNewWindow: true });
   } finally {
-    const activeExtension = vscode.extensions.getExtension(EXTENSION_ID);
-    assert.ok(activeExtension, 'The activated extension must still be registered for teardown.');
-    const lifecycle = await import(pathToFileURL(join(activeExtension.extensionPath, 'build', 'extension.js')).href) as { deactivate(): Promise<void> };
-    await lifecycle.deactivate();
-    delete process.env.KILO_DB;
-    delete process.env.KILO_HUB_SYNTHETIC_TEST;
-    await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
-    rmSync(fixtureRoot, { force: true, recursive: true });
-    if (suppliedPath) {
-      for (const suffix of ['', '-wal', '-shm']) rmSync(`${suppliedPath}${suffix}`, { force: true });
-    }
+    // Keep the synthetic source configured until VS Code deactivates the real instance.
+    // The parent runner removes its fixtures only after runTests has observed host exit.
   }
 }
 

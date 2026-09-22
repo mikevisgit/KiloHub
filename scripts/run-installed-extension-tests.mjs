@@ -54,6 +54,7 @@ const runtimeEnvironment = {
   ...process.env,
   KILO_DB: path.join(smokeRoot, 'synthetic-source-not-created.sqlite'),
   KILO_HUB_SYNTHETIC_TEST: '1',
+  KILO_HUB_TEST_FIXTURE_ROOT: smokeRoot,
   KILO_HUB_NO_EXTERNAL_TOOLS: '1',
   NODE_TLS_REJECT_UNAUTHORIZED: '1',
 };
@@ -103,5 +104,11 @@ try {
     reuseMachineInstall: false,
   }));
 } finally {
-  await testHost.restore();
+  try { await testHost.restore(); }
+  finally {
+    for (const suffix of ['', '-wal', '-shm']) {
+      await rm(`${runtimeEnvironment.KILO_DB}${suffix}`, { force: true, maxRetries: 10, retryDelay: 200 });
+    }
+    await rm(path.join(smokeRoot, 'hub'), { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  }
 }
