@@ -1,5 +1,15 @@
 # Выпуск Step 3
 
+## Исправление0.3.1
+
+Установлен `local.kilo-hub@0.3.1`. Source `39caca5b68801db379b436885df8f4e19c9f0331`; файл `D:\VSCode\KiloHub\dist\kilo-hub-0.3.1-win32-x64.vsix`,55004bytes,SHA-256 `EB87BB225F32E9F85C118AB729B03B152DC4602DA08A11D50C6B2AFF346CC5A7`.
+
+Полный `npm run release` на этом commit завершился exit0: два clean ci/audit/test/package цикла,112unit/35component каждый, одинаковый checksum,7negative cases, development и installed1.105.1/1.138.0 с controlled PATH. Audit0. Предыдущая попытка на8b3832e остановилась на EBUSY cleanup; исправление39caca5 переносит удаление synthetic fixtures в parent после выхода Extension Host, без отключения assertions или изменения production.
+
+Независимый package review:0/0/0/0, PACKAGE APPROVED.13entries,5bundles и текстовые/assets Git blobs сверены. Основная установка `code.cmd --install-extension ... --force` успешна; CLI подтвердил0.3.1. Поиск принимает короткие слова внутри запроса от3символов; схема и импорт не менялись. Реальная пользовательская приёмка/reload открытого окна остаётся отдельной.
+
+## Исходный выпуск0.3.0
+
 Дата: 22 сентября 2026 года. `local.kilo-hub@0.3.0`, Windows x64.
 
 - Source: `b6bac3ff36bfdac2683f1bad62aa1b54ac4dc7dc`.

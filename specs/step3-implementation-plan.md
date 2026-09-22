@@ -4,6 +4,8 @@ Scope: `req/step3/01-requirements.md`; приёмка: `req/step3/02-acceptance.
 
 После пользовательской проверки0.3.0 уточнён SEARCH-03: три символа для всего запроса, короткие слова не запрещены и не игнорируются. Исправляются общий parser, literal fallback/сужение по длинным токенам, предупреждение и тесты; новая схема/индексация не нужны. Исторические пункты ниже о минимуме каждого токена относятся к исходному выпуску и заменены новым контрактом.
 
+Исправление завершено и выпущено как0.3.1 из39caca5:112unit/35component в каждом из двух clean release циклов, exact/negative/installed gates PASS, пакет установлен в основной VS Code. Source/package review без findings. Evidence/hash в docs/step3-verification.md; ручная визуальная приёмка отдельно.
+
 ## A. Discovery
 
 - [x] По решению пользователя актуализировать `agents.md` до фиксации нормативного пакета: Step 3 scope, read-only Kilo, ограниченный user-text runtime после Gate A, синтетический discovery.
