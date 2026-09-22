@@ -1,5 +1,17 @@
 # Передача состояния Kilo Hub
 
+## Step 4: повторное исследование 22 сентября 2026 года
+
+Для публичного `mikevisgit/KiloHub` документы этого этапа выделены в ветку `step4`; Windows baseline остаётся в `master`. Production Step 4 не начат. Два неотслеживаемых production-scale scripts не включаются в эту публикацию и сохраняются локально.
+
+По запросу пользователя добавлен `docs/step4-discovery-0.3.2.md`, обновлены `req/step4/` и `specs/step4-implementation-plan.md`. Исследование основано на source `ce9fba0906e49f756b17b53bf01b1f94273d0ff8` при HEAD `f7afdd5cb335fceb78c69b958b88379d0064a221`; отслеживаемые src/scripts/tests/manifest/lock совпадают с release source. Повторный `Get-FileHash -Algorithm SHA256` для `D:\VSCode\KiloHub\dist\kilo-hub-0.3.2-win32-x64.vsix` подтвердил `36227DB87DCC66B4E504E401E55852FF412883126CD2BA94B2CA546A08D29E67`; размер по release evidence 55469 bytes.
+
+Зафиксированы schema 3, пять build assets, FTS5 trigram/точный instr, короткие слова и auto-search 300 ms, durable FIFO/staging/census, Windows named pipe + SQL fencing. Новые акценты macOS: stale IPC endpoint/длина, POSIX unlink открытого поколения SQLite, pointer rename/durability, permissions и сохранённые Windows identity. Повторно прочитаны фиксированные upstream Kilo global.ts, xdg-basedir и Node 22.19 IPC docs. Подготовлена матрица M01–M12 для обеих нативных архитектур.
+
+Gate 0 не закрыт: macOS runtime/APFS/Finder/VoiceOver не проверены; Windows release evidence не заменяет эти проверки. Выпуск Step 3 подтверждён, но ручная приёмка остаётся неподтверждённой, а нижние C/D статусы плана Step 3 исторически расходятся с записью выпуска 0.3.2. Это явно записанный блокер входа, не основание автоматически закрыть или заново запустить все gates. Следующий этап: итоговый статус Step 3 и native macOS discovery до выбора storage/ownership/package contract.
+
+Изменения только документационные; production/VSIX/данные Kilo не менялись, личная переписка не читалась. Уже существовавшие неотслеживаемые production-scale scripts сохранены и не использованы как release evidence. Новых runtime/test/package прогонов нет. Независимая статическая проверка документов/локальных ссылок/выборочных source facts: PASS, существенных замечаний нет; отчёт `reviews/step4-discovery-0.3.2-review.md`. `git diff --check` для отслеживаемых изменений PASS. Коммит не выполнялся.
+
 ## Текущее состояние
 
 - Статус: пользовательская визуальная приёмка `0.2.0` выявила blocking CSS-дефекты; готовится hotfix `0.2.1`, прежний VSIX не является финальным.
